@@ -4,7 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<title>STOCKTERM — Equity Analysis Terminal</title>
+<title>stockterm — stock research that shows its work</title>
+<meta name="description" content="A stock research terminal in a single HTML file. Scores companies against rules you control, shows the full audit trace behind every point, runs a DCF, and cites every claim back to the filing it came from.">
+<meta name="author" content="stockterm">
+<meta name="theme-color" content="#0a0813">
+
+<!-- Link preview when the URL is shared. Replace SITE_URL via setup.ps1. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="stockterm">
+<meta property="og:title" content="stockterm — stock research that shows its work">
+<meta property="og:description" content="Scores companies against rules you control, shows the audit trace behind every point, and cites every claim back to the filing. One HTML file, no install.">
+<meta property="og:url" content="SITE_URL">
+<meta property="og:image" content="SITE_URL/docs/screenshot-analysis.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="stockterm — stock research that shows its work">
+<meta name="twitter:description" content="Scores companies against rules you control, shows the audit trace behind every point, and cites every claim back to the filing.">
+<meta name="twitter:image" content="SITE_URL/docs/screenshot-analysis.png">
+
+<!-- Inline favicon: no external file, keeps the app self-contained -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%238b7cf6'/%3E%3Cstop offset='1' stop-color='%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23g)'/%3E%3Cpath d='M14 42 L26 30 L34 36 L50 20' stroke='%23fff' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
 /* ── design tokens ─────────────────────────────────────────────── */
 :root{
@@ -1907,9 +1925,10 @@ function viewSetup(){
     '<div class="logo" style="justify-content:center;margin-bottom:20px">' +
       '<span class="mk">S</span><b>stockterm</b></div>' +
     '<div class="setup-card">' +
-      '<h2 style="font-size:20px;letter-spacing:-.02em;margin-bottom:6px">One-time setup</h2>' +
-      '<div class="prose" style="color:var(--dim)">This app runs entirely in your browser. ' +
-      'It needs one free API key, stored on this device only — never in the file.</div>' +
+      '<h2 style="font-size:20px;letter-spacing:-.02em;margin-bottom:6px">Connect your data</h2>' +
+      '<div class="prose" style="color:var(--dim)">stockterm runs entirely in your browser. ' +
+      'Bring your own free Finnhub key and it is stored on this device only — never in the file, ' +
+      'never sent anywhere but Finnhub.</div>' +
       '<ol class="steps">' +
         '<li><div class="prose">Open <a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer">finnhub.io/register</a> and make a free account.</div></li>' +
         '<li><div class="prose">Copy the API key from your dashboard.</div></li>' +
@@ -2778,11 +2797,11 @@ function view(){
 
   var demoBar = State.demo
     ? '<div class="demobar">' +
-        '<span class="tag warn">demo</span>' +
-        '<span><b>You are seeing real ' + esc(State.ticker) + ' data from ' + esc(CFG.DEMO ? CFG.DEMO.asOf : '') + '.</b> ' +
-        'Everything works. To search any other ticker with live prices, add a free key — it takes a minute.</span>' +
+        '<span class="tag warn">sample data</span>' +
+        '<span><b>Showing real ' + esc(State.ticker) + ' figures from ' + esc(CFG.DEMO ? CFG.DEMO.asOf : '') + '.</b> ' +
+        'Connect a free Finnhub key to research any ticker with live prices — one minute, no card.</span>' +
         '<div class="sp"></div>' +
-        btn('wantSetup','Add free key','primary') +
+        btn('wantSetup','Connect data','primary') +
       '</div>'
     : '';
 
