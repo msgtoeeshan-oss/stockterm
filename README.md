@@ -12,9 +12,11 @@ It scores a company against rules you control, shows the full audit trace behind
 
 ## Try it
 
-Click the demo link above. Real Apple data is bundled in, so every tab works immediately — signal engine, DCF, sensitivity grid, evidence pack. Nothing to install, no key, no account.
+Click the link above. **24 major companies are bundled in with real data** — Apple, Microsoft, Nvidia, Alphabet, Amazon, Meta, Tesla, Broadcom, JPMorgan, Visa, Walmart, Exxon, UnitedHealth, Mastercard, Costco, Home Depot, P&G, J&J, Coca-Cola, PepsiCo, AMD, Netflix, Disney and Intel.
 
-To research **any** ticker with live prices:
+Every feature works on all of them with **no key, no account and no install**: the signal engine, the DCF and its sensitivity grid, the full rule trace, and the evidence pack with links to the real SEC filings.
+
+To research the **rest of the market** with live prices:
 
 1. Get a free key at [finnhub.io/register](https://finnhub.io/register) — a minute, no card
 2. Paste it into the app
