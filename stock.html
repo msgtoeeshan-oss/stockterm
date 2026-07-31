@@ -166,6 +166,19 @@ input:focus{border-color:var(--accent);outline:none}
 .qlist{margin:10px 0 0;padding-left:20px;color:var(--faint);font-size:12px;line-height:1.65}
 .qlist li{margin-bottom:2px}
 
+/* ── debate stepper ────────────────────────────────────────────── */
+.dsteps{display:flex;gap:8px;flex-wrap:wrap}
+.dstep{display:flex;align-items:center;gap:8px;font-family:var(--sans);font-size:12.5px;font-weight:600;
+  padding:9px 15px;border-radius:var(--r-pill);border:1px solid var(--line);background:var(--panel-2);color:var(--faint)}
+.dstep .dot{width:19px;height:19px;border-radius:50%;background:var(--well);border:1px solid var(--line-2);
+  display:flex;align-items:center;justify-content:center;font-size:10.5px}
+.dstep.done{color:var(--pos);border-color:rgba(52,211,153,.4)}
+.dstep.done .dot{background:rgba(52,211,153,.16);border-color:transparent;color:var(--pos)}
+.dstep.live{color:var(--text);border-color:var(--accent)}
+.jbox{border:1px solid var(--line);border-left:3px solid var(--line-2);border-radius:var(--r-sm);padding:13px 15px;background:var(--panel-2)}
+.jbox.pos{border-left-color:var(--pos)}
+.jbox.neg{border-left-color:var(--neg)}
+
 /* ── document drop zone ────────────────────────────────────────── */
 .drop{border:1.5px dashed var(--line-2);border-radius:var(--r);padding:24px 20px;text-align:center;
   background:var(--panel-2);transition:border-color .15s,background .15s}
@@ -344,7 +357,9 @@ var CFG = {
      2.5-flash serves fine. Change AI_MODEL if that ever flips. */
   AI_MODEL: 'gemini-2.5-flash',
   AI: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
-  AI_MAX_TOKENS: 6000,   /* 8 cited answers need far more room than a summary */
+  /* 8 answers, each carrying verbatim filing quotes, overrun anything smaller.
+     Measured: a Munger memo against a full 10-K truncates at 6000. */
+  AI_MAX_TOKENS: 16000,
   AI_LABEL: 'Google Gemini 2.5 Flash',
   LS_DATA: 'stockterm.data.v2',
   LS_KEYS: 'stockterm.keys.v1',   /* browser storage only — never the file */
@@ -457,6 +472,21 @@ var CFG = {
     {id:'7A',  title:'Item 7A. Quantitative and Qualitative Disclosures About Market Risk', cap:4000}
   ],
   DOC_TOTAL_CAP: 60000,   /* hard ceiling on document text sent to the model */
+
+  /* Adjudication pass. Lynch Pitch already argues the bull side and Munger
+     Invert the bear side, so the missing piece is a third reader who scores
+     them against the evidence rather than against each other's rhetoric. */
+  JUDGE_ROLE:
+    'You are an investment committee chair. Two analysts have written opposing memos on the same\n' +
+    'company from the SAME evidence pack. You did not write either. Your job is not to split the\n' +
+    'difference or to pick the better-written memo — it is to decide which claims the evidence\n' +
+    'actually supports, and to catch either analyst overreaching beyond what they cited.\n\n' +
+    'Judge on evidence only:\n' +
+    '  - A claim with a real citation outweighs a confident claim without one.\n' +
+    '  - If an analyst asserted something the SOURCES do not contain, name it as an overreach.\n' +
+    '  - If both sides ignored something material that IS in SOURCES, say so.\n' +
+    '  - Where the evidence genuinely cannot settle a disagreement, say that rather than guessing.\n' +
+    '  - You may not introduce facts of your own. The same sourcing rules bind you.\n',
 
   DEF_WEIGHTS: {valuation:25, growth:25, quality:25, balance:25},
   DEF_DCF:     {growth:8, fade:10, terminal:2.5, discount:9},
@@ -691,6 +721,7 @@ var State = {
   metric:    null,
   annuals:   [],
   filings:   [],
+  deb:       {status:'idle', bull:null, bear:null, judge:null, error:'', at:''},
   docs:      [],      /* uploaded filings — memory only, never persisted */
   docWarn:   [],
   dropping:  false,
@@ -917,6 +948,71 @@ function fetchWatchlist(){
 }
 
 /* Verify before storing: a key that does not work should never be saved. */
+/* Bull -> Bear -> Judge. Three sequential calls; the judge sees both memos and
+   the same evidence pack, so it can catch either side inventing support. */
+function apiJudge(evidence, bull, bear){
+  var memo = function(tag, mode, out){
+    var def = CFG.MODES.filter(function(x){ return x.id===mode; })[0];
+    return tag + ' — "' + def.label + '"\n' +
+      (out.answers||[]).map(function(a){
+        var i = (num(a.n)||0)-1;
+        return (a.n||'?') + '. ' + (def.questions[i]||'') + '\n' +
+               '   ANSWER: ' + String(a.answer||'') + '\n' +
+               '   CITED: ' + (asArr(a.citations).length ? asArr(a.citations).join(' | ') : 'NOTHING CITED') +
+               (a.notFound ? '\n   (analyst marked this unanswerable)' : '');
+      }).join('\n') +
+      '\n   BOTTOM LINE: ' + String(out.bottomLine||'—') + '\n';
+  };
+
+  var prompt =
+    'ROLE\n' + CFG.JUDGE_ROLE + '\n' +
+    CFG.RULES + '\n' +
+    'MEMO A (bull side)\n' + memo('MEMO A', 'lynch', bull) + '\n' +
+    'MEMO B (bear side)\n' + memo('MEMO B', 'munger', bear) + '\n' +
+    evidence.text + '\n\n' +
+    'OUTPUT\nRaw JSON only — no markdown fences, no preamble. Schema:\n' +
+    '{"verdict":string,"betterSupported":"bull"|"bear"|"neither",' +
+    '"strongestBullPoint":string,"strongestBearPoint":string,' +
+    '"overreaches":[{"side":"bull"|"bear","claim":string,"why":string}],' +
+    '"bothMissed":[string],"unresolvable":[string],"whatWouldSettleIt":[string],' +
+    '"evidenceQuality":string}\n\n' +
+    'verdict: 3-5 sentences on which case the evidence supports and how strongly.\n' +
+    'betterSupported: judged on citation quality, not persuasiveness. Use "neither" if the\n' +
+    '  evidence pack is too thin to favour either side, and say so in verdict.\n' +
+    'overreaches: every claim either analyst made that SOURCES does not support. Empty if none.\n' +
+    'bothMissed: material facts present in SOURCES that neither memo used.\n' +
+    'unresolvable: disagreements the evidence cannot settle either way.\n' +
+    'evidenceQuality: one sentence on whether this pack is strong enough to decide anything.';
+
+  return fetch(CFG.AI + '?key=' + encodeURIComponent(AI_KEY), {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      contents:[{parts:[{text: prompt}]}],
+      generationConfig:{maxOutputTokens: CFG.AI_MAX_TOKENS, responseMimeType:'application/json',
+                        temperature:0.2, thinkingConfig:{thinkingBudget:0}}
+    })
+  })
+  .catch(function(){ throw new ApiErr(netMsg('generativelanguage.googleapis.com'), 0); })
+  .then(function(r){
+    return r.json().catch(function(){ throw new ApiErr('Malformed response from the model endpoint.',0); })
+      .then(function(data){
+        if(!r.ok){
+          var msg = (data && data.error && data.error.message) ? data.error.message : ('HTTP ' + r.status);
+          if(r.status===429 && /limit:\s*0\b/.test(msg))
+            throw new ApiErr('The key works, but its Google project has no Gemini quota (free-tier "limit: 0").', 429);
+          throw new ApiErr('Judge request failed: ' + msg, r.status);
+        }
+        var cand = data.candidates && data.candidates[0];
+        if(!cand) throw new ApiErr('The model returned no content.', 0);
+        var text = ((cand.content && cand.content.parts) || []).map(function(p){ return p.text||''; }).join('');
+        if(!text.trim()) throw new ApiErr('The model returned an empty response.', 0);
+        try { return parseLooseJson(text); }
+        catch(e){ throw new ApiErr('Could not parse the judge output as JSON' +
+          (cand.finishReason==='MAX_TOKENS'?' — it was cut off at the token limit.':'.'), 0); }
+      });
+  });
+}
+
 function verifyFinnhubKey(key){
   return fetch(CFG.FH + '/quote?symbol=AAPL&token=' + encodeURIComponent(key),
                {method:'GET', mode:'cors', cache:'no-store'})
@@ -1105,6 +1201,9 @@ function apiThesis(evidence){
     '"bottomLine":string,"notFound":[string],"inferences":[string],"recencyNote":string}\n\n' +
     'answers must contain exactly ' + mode.questions.length + ' items, n = 1..' + mode.questions.length + '.\n' +
     'Each citations entry must be formatted "[SOURCE-ID, field]: value" using ids from SOURCES above.\n' +
+    'Keep each quoted excerpt under 180 characters — enough to verify against the source, not a wall\n' +
+    'of text. Quote the sentence that carries the point, not the paragraph around it.\n' +
+    'Cite at most 3 sources per answer. Prefer one precise citation to several loose ones.\n' +
     'Set notFound true for any question SOURCES cannot answer, and say so in the answer text.\n' +
     'recencyNote: the most recent fiscal year you used, and a flag if you had to fall back to older data.';
 
@@ -2244,6 +2343,46 @@ function viewLocalAssessment(m){
     '</div>';
 }
 
+/* Judge verdict. Overreaches are the point: a claim neither side could
+   support is more informative than the argument it was used to win. */
+function renderJudge(j){
+  var side = String(j.betterSupported||'').toLowerCase();
+  var sideTag = side==='bull' ? tag('bull better supported','pos')
+              : side==='bear' ? tag('bear better supported','neg')
+              : tag('evidence favours neither','warn');
+  var over = asArr(j.overreaches).map(function(o){
+    if(typeof o === 'string') return {side:'', claim:o, why:''};
+    return {side:String((o&&o.side)||'').toLowerCase(), claim:(o&&o.claim)||'', why:(o&&o.why)||''};
+  });
+  return '<div class="hr"></div>' +
+    '<div class="row" style="margin-bottom:10px">' + sideTag +
+      (j.evidenceQuality ? '<span class="faint" style="font-size:11.5px">'+esc(j.evidenceQuality)+'</span>' : '') +
+    '</div>' +
+    '<div class="prose" style="font-size:14.5px;line-height:1.65">'+esc(j.verdict||'—')+'</div>' +
+    '<div class="grid g2" style="margin-top:14px">' +
+      '<div class="jbox pos"><div class="lbl">Strongest bull point</div>' +
+        '<div class="prose">'+esc(j.strongestBullPoint||'—')+'</div></div>' +
+      '<div class="jbox neg"><div class="lbl">Strongest bear point</div>' +
+        '<div class="prose">'+esc(j.strongestBearPoint||'—')+'</div></div>' +
+    '</div>' +
+    (over.length
+      ? '<div class="lbl" style="margin:16px 0 6px">Overreach — claimed without support in the sources</div>' +
+        '<ul class="findings">' + over.map(function(o){
+          return '<li><span class="mk n">!</span><span><span class="pl">'+esc(o.claim)+'</span>' +
+            '<span class="tech">'+esc((o.side?o.side+' side · ':'')+(o.why||''))+'</span></span></li>';
+        }).join('') + '</ul>'
+      : '<div class="note acc" style="margin-top:14px"><b>No overreach found</b>' +
+        '<div class="prose">The judge found every claim on both sides backed by a citation.</div></div>') +
+    '<div class="grid g2" style="margin-top:6px">' +
+      panel('Both sides missed', asArr(j.bothMissed).length ? bullets(j.bothMissed)
+        : '<div class="prose">Nothing material in the sources went unused.</div>') +
+      panel('The evidence cannot settle', asArr(j.unresolvable).length ? bullets(j.unresolvable)
+        : '<div class="prose">No disagreement was left open.</div>') +
+    '</div>' +
+    (asArr(j.whatWouldSettleIt).length
+      ? panel('What would settle it', bullets(j.whatWouldSettleIt)) : '');
+}
+
 function viewThesis(m){
   var localPart = viewLocalAssessment(m);
 
@@ -2305,6 +2444,33 @@ function viewThesis(m){
     docs.length ? '<span class="tag pos">qualitative questions enabled</span>'
                 : '<span class="tag warn">numbers only</span>');
 
+  /* ---- bull / bear / judge ---- */
+  var db = State.deb || {status:'idle'};
+  var step = function(k, label){
+    var order = {bull:0, bear:1, judge:2, done:3};
+    var cur = order[db.status]; var mine = order[k];
+    var st = db.status==='done' ? 'done'
+           : (db.status==='error' ? (mine < cur ? 'done' : 'idle')
+           : (mine < cur ? 'done' : (mine === cur ? 'live' : 'idle')));
+    return '<div class="dstep ' + st + '">' +
+      '<span class="dot">' + (st==='done'?'✓':(st==='live'?'<span class="spin"></span>':(mine+1))) + '</span>' +
+      esc(label) + '</div>';
+  };
+  var running = db.status==='bull' || db.status==='bear' || db.status==='judge';
+  var debatePanel = panel('Bull vs Bear vs Judge',
+    '<div class="prose" style="margin-bottom:12px">Runs the Lynch Pitch and the Munger Invert on the same evidence, ' +
+    'then has a third pass score them <b>on citation quality rather than persuasiveness</b> — ' +
+    'catching either side asserting something the sources do not contain.</div>' +
+    '<div class="dsteps">' + step('bull','Bull case') + step('bear','Bear case') + step('judge','Judge') + '</div>' +
+    '<div class="row" style="margin-top:14px">' +
+      btn('debate', running?'Running…':'Run debate', 'primary', running?'disabled':'') +
+      (db.at ? '<span class="faint mono" style="font-size:11px">' + esc(db.at) + '</span>' : '') +
+      '<span class="faint" style="font-size:11.5px">3 model calls</span>' +
+    '</div>' +
+    (db.status==='error' ? note('Debate failed','<div class="prose">'+esc(db.error)+'</div>','neg') : '') +
+    (db.status==='done' && db.judge ? renderJudge(db.judge) : ''),
+    db.status==='done' ? '<span class="tag acc">verdict ready</span>' : '');
+
   var head = modePicker + '<div class="row" style="margin:12px 0 6px">' +
     btn('thesis', t.status==='loading'?'Generating…':'Generate thesis', 'primary', t.status==='loading'?'disabled':'') +
     (t.at ? '<span class="faint mono" style="font-size:9.5px">generated '+esc(t.at)+'</span>' : '') +
@@ -2317,11 +2483,11 @@ function viewThesis(m){
     '<b>A mode changes which questions get asked of the same filings — it does not train the model and adds no ability to predict prices.</b></div>';
 
   if(t.status==='loading')
-    return localPart + docPanel + panel('Model thesis', head + note('Working', '<span class="spin"></span> Sending metrics and waiting for the response…', 'acc'));
+    return localPart + docPanel + debatePanel + panel('Model thesis', head + note('Working', '<span class="spin"></span> Sending metrics and waiting for the response…', 'acc'));
   if(t.status==='error')
-    return localPart + docPanel + panel('Model thesis', head + note('Thesis failed', '<div class="prose">'+esc(t.error)+'</div>', 'neg'));
+    return localPart + docPanel + debatePanel + panel('Model thesis', head + note('Thesis failed', '<div class="prose">'+esc(t.error)+'</div>', 'neg'));
   if(t.status!=='done' || !t.data)
-    return localPart + docPanel + panel('Model thesis', head + '<div class="faint mono" style="font-size:10.5px;padding:14px 0;text-align:center">' +
+    return localPart + docPanel + debatePanel + panel('Model thesis', head + '<div class="faint mono" style="font-size:10.5px;padding:14px 0;text-align:center">' +
       'No model thesis generated for ' + esc(State.ticker) + ' yet — the assessment above needs no model.</div>');
 
   /* ---- cited-answer rendering (research framework) ---- */
@@ -2352,7 +2518,7 @@ function viewThesis(m){
     }).join('');
 
     return localPart +
-      docPanel + panel(curMode.label + ' — ' + State.ticker, head) +
+      docPanel + debatePanel + panel(curMode.label + ' — ' + State.ticker, head) +
       panel('Answers', '<div class="qa-wrap">' + qaHtml + '</div>' +
         (d.bottomLine ? '<div class="hr"></div><div class="lbl" style="margin-bottom:5px">Bottom line</div>' +
           '<div class="prose">'+esc(d.bottomLine)+'</div>' : ''),
@@ -2766,6 +2932,38 @@ var ACT = {
   },
 
   toggleAll: function(){ State.showAll = !State.showAll; set({}); },
+  debate: function(){
+    var m = State.metrics;
+    if(!m){ toast('load a ticker first'); return; }
+    if(!AI_KEY){ set({tab:'settings'}); return; }
+
+    var evidence = buildEvidence(m);
+    State.evidence = evidence;
+    var saveMode = State.mode;
+    State.deb = {status:'bull', bull:null, bear:null, judge:null, error:'', at:''};
+    render();
+
+    var runMode = function(id){ State.mode = id; return apiThesis(evidence); };
+
+    runMode('lynch').then(function(bull){
+      State.deb.bull = bull; State.deb.status = 'bear'; render();
+      return runMode('munger');
+    }).then(function(bear){
+      State.deb.bear = bear; State.deb.status = 'judge'; render();
+      return apiJudge(evidence, State.deb.bull, bear);
+    }).then(function(judge){
+      State.mode = saveMode;
+      State.deb = {status:'done', bull:State.deb.bull, bear:State.deb.bear,
+                   judge:judge, error:'', at:nowStamp()};
+      render();
+    }).catch(function(err){
+      State.mode = saveMode;
+      State.deb.status = 'error';
+      State.deb.error = (err && err.message) || 'Debate failed.';
+      render();
+    });
+  },
+
   rmDoc: function(el){
     var i = parseInt(el.getAttribute('data-i'),10);
     if(isFinite(i)) State.docs.splice(i,1);
