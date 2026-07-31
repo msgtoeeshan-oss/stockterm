@@ -25,7 +25,33 @@ Optionally add a [Google AI Studio](https://aistudio.google.com/apikey) key in *
 > ✓ Owes less than shareholders have put in — *D/E < 1.0 · now 0.80x · 40 pts*
 > ✕ Costs under 20x its annual profit — *P/E < 20 · now 39.9x · 40 pts*
 
-Plus **what would have to change** to move the score, and the data gaps behind it.
+Plus **what would have to change** to move the score, and the data gaps behind it. None of this needs an AI key.
+
+### Sourced research
+
+With a Gemini key, the same tab runs a research pass with **quote-first sourcing discipline**. Three modes, each a fixed question set answered in order:
+
+- **Lynch Pitch** — why would I own this? One main idea, no stories.
+- **Munger Invert** — how could I lose money? Assumes the idea is bad and tries to invalidate it.
+- **Business Brief** — what the filings actually say, without arguing a side.
+
+Every claim must cite a source and value, or be marked *Not found in sources*:
+
+```
+[FILING-FY2025, us-gaap:Revenues]: 416161000000 -> ...
+[DOC-AAPL-ITEM1A, "component supply"]: "Because the Company currently obtains
+certain components from single or limited sources..." -> ...
+```
+
+The model is told its own training knowledge does not count. Interpretations beyond a cited number are flagged as inferences, and the fiscal year used is reported.
+
+### Drop in the 10-K
+
+Numbers say what a company earned; only the filing says what it *does* and what management admits could go wrong. Drag a 10-K onto the Analysis tab — the app extracts **Item 1 (Business)**, **Item 1A (Risk Factors)** and **Item 7 (MD&A)** and adds them as quotable sources. The app already links the right document for you.
+
+Measured on Apple's FY2025 10-K: without it the model refuses two Munger questions outright; with it, refusals drop to zero and 39 of 41 citations quote the filing directly.
+
+HTML or plain text. **PDF is not supported** — that would need an external library, and SEC publishes the same filing as `.htm`. Files are read in your browser with `FileReader`; nothing is uploaded anywhere.
 
 **Overview** — live quote, key metrics, revenue/income/cash-flow history, margin trends, a watchlist heatmap and movers table.
 
