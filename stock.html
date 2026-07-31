@@ -134,9 +134,21 @@ input:focus{border-color:var(--accent);outline:none}
 .breadth-b i.o{background:var(--line-2)}
 
 /* ── verdict header (Analysis tab) ─────────────────────────────── */
-.verdict{display:flex;align-items:center;gap:26px;flex-wrap:wrap;margin:12px 0;padding:26px 28px;
+.verdict{margin:12px 0;padding:26px 28px;
   background:linear-gradient(120deg,rgba(139,124,246,.16),rgba(236,72,153,.09)),var(--panel);
   border:1px solid var(--line-2);border-radius:var(--r)}
+.vtop{display:flex;align-items:center;gap:26px;flex-wrap:wrap}
+/* factor bars */
+.fbars{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;
+  margin-top:22px;padding-top:20px;border-top:1px solid var(--line)}
+.fb-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:7px}
+.fb-h span:first-child{font-family:var(--sans);font-size:12px;font-weight:600;color:var(--dim)}
+.fb-v{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--faint);font-variant-numeric:tabular-nums}
+.fb-v.pos{color:var(--pos)} .fb-v.warn{color:var(--warn)} .fb-v.neg{color:var(--neg)}
+.fb-t{height:6px;background:var(--well);border-radius:var(--r-pill);overflow:hidden}
+.fb-t i{display:block;height:100%;background:var(--line-2);border-radius:var(--r-pill)}
+.fb-t i.pos{background:var(--pos)} .fb-t i.warn{background:var(--warn)} .fb-t i.neg{background:var(--neg)}
+.fb-x{font-family:var(--sans);font-size:10.5px;color:var(--faint);margin-top:5px}
 .vscore{font-family:var(--mono);font-size:68px;line-height:.95;letter-spacing:-.055em;font-variant-numeric:tabular-nums}
 .vscore span{font-size:19px;color:var(--faint);letter-spacing:0}
 .vtext{flex:1;min-width:280px}
@@ -727,6 +739,7 @@ var State = {
   annuals:   [],
   filings:   [],
   demo:      false,   /* bundled snapshot mode - no network */
+  wantSetup: false,
   deb:       {status:'idle', bull:null, bear:null, judge:null, error:'', at:''},
   docs:      [],      /* uploaded filings — memory only, never persisted */
   docWarn:   [],
@@ -1477,7 +1490,7 @@ function runSignal(m, weights){
    fired and the values they tested. No model, no network, no guessing — this
    is the audit trace restated in prose, so the Thesis tab is never empty. */
 function localAssessment(m, sig, dcf){
-  var strengths=[], weaknesses=[], notAssessed=[], levers=[], gaps=[], superseded=[];
+  var strengths=[], weaknesses=[], notAssessed=[], levers=[], gaps=[], superseded=[], capped=[];
 
   sig.factors.forEach(function(f){
     /* A missed tier whose input already satisfied a higher-scoring tier is not
@@ -1510,9 +1523,7 @@ function localAssessment(m, sig, dcf){
         notAssessed.push({text:r.label, plain:plain, factor:f.label});
       }
     });
-    if(f.capped) gaps.push(f.label + ' can score at most ' + f.maxAchievable + ' of ' + f.possible +
-      ' points (' + (f.maxAchievable/f.possible*100).toFixed(0) + '%) because its tiered rules are mutually exclusive — ' +
-      'a flawless company still cannot reach 100 on this factor.');
+    if(f.capped) capped.push(f.label + ' ' + (f.maxAchievable/f.possible*100).toFixed(0) + '%');
     if(!f.included) gaps.push(f.label + ' was dropped from the composite entirely — only ' +
       f.present + ' of ' + f.inputs + ' inputs were available (' + f.missing.join(', ') + ').');
     else if(f.missing.length) gaps.push(f.label + ' scored on partial data; missing: ' + f.missing.join(', ') + '.');
@@ -1521,6 +1532,10 @@ function localAssessment(m, sig, dcf){
   strengths.sort(function(a,b){ return b.pts-a.pts; });
   weaknesses.sort(function(a,b){ return b.pts-a.pts; });
   levers.sort(function(a,b){ return b.pts-a.pts; });
+
+  /* One line beats three near-identical ones. */
+  if(capped.length) gaps.push('Tiered rules are mutually exclusive, so some factors cannot reach 100 even for ' +
+    'a flawless company — ceilings are ' + capped.join(', ') + '.');
 
   if(m.years.length && m.years.length < 3)
     gaps.push('Only ' + m.years.length + ' year(s) of annual filings parsed, so CAGR and margin-trend figures rest on a very short history.');
@@ -1904,7 +1919,7 @@ function viewSetup(){
         'autocomplete="off" spellcheck="false" placeholder="Paste your Finnhub key" value="'+attr(Draft.finnhub)+'">' +
       '<div class="row" style="margin-top:12px">' +
         btn('saveFinnhub', v.status==='checking'?'Checking…':'Verify and start', 'primary', v.status==='checking'?'disabled':'') +
-        (CFG.DEMO ? btn('demo','Or explore the demo first','ghost') : '') +
+        (CFG.DEMO ? btn('demo','Back to the demo','ghost') : '') +
       '</div>' +
       (CFG.DEMO ? '<div class="faint" style="font-size:11.5px;margin-top:8px">' +
         'The demo is real ' + esc(CFG.DEMO.ticker) + ' data captured on ' + esc(CFG.DEMO.asOf) +
@@ -1943,10 +1958,13 @@ function viewHeader(){
       }).join('') +
       '<div class="sp"></div>' +
       (State.loading?'<span class="clock"><span class="spin"></span> fetching</span>':'') +
-      '<button type="button" class="nav-i" data-act="toggleLive" ' +
-        'title="'+attr(State.live ? 'Polling the quote every '+(CFG.LIVE_MS/1000)+'s. Click to pause.' : 'Auto-refresh paused. Click to resume.')+'">' +
-        (State.live ? '<span style="color:#2fd35f">●</span> LIVE ' + (CFG.LIVE_MS/1000) + 's'
-                    : '<span style="color:#8b93a1">❚❚</span> PAUSED') + '</button>' +
+      /* Never claim "LIVE" over frozen snapshot data. */
+      (State.demo
+        ? '<span class="nav-i" style="cursor:default"><span style="color:var(--warn)">■</span> FROZEN</span>'
+        : '<button type="button" class="nav-i" data-act="toggleLive" ' +
+          'title="'+attr(State.live ? 'Polling the quote every '+(CFG.LIVE_MS/1000)+'s. Click to pause.' : 'Auto-refresh paused. Click to resume.')+'">' +
+          (State.live ? '<span style="color:var(--pos)">●</span> LIVE ' + (CFG.LIVE_MS/1000) + 's'
+                      : '<span style="color:var(--dim)">❚❚</span> PAUSED') + '</button>') +
       '<span class="clock">'+esc(clockStr())+'</span>' +
     '</div></nav>';
 }
@@ -2348,17 +2366,31 @@ function viewLocalAssessment(m){
      : sig.composite>=34 ? 'It fails more of your tests than it passes.'
      : 'It fails most of the tests you set.');
 
+  /* Four bars turn a paragraph into a shape you can read in a second. */
+  var fbars = '<div class="fbars">' + sig.factors.map(function(f){
+    var v = f.included ? clamp(f.score,0,100) : null;
+    var cl = v===null ? '' : (v>=70?'pos':(v>=45?'warn':'neg'));
+    return '<div class="fbar">' +
+      '<div class="fb-h"><span>'+esc(f.label)+'</span>' +
+        '<span class="fb-v '+cl+'">'+(v===null?'n/a':fx(v,0))+'</span></div>' +
+      '<div class="fb-t"><i class="'+cl+'" style="width:'+(v===null?0:v).toFixed(1)+'%"></i></div>' +
+      (f.included ? '' : '<div class="fb-x">too little data</div>') +
+    '</div>';
+  }).join('') + '</div>';
+
   return '<div class="verdict">' +
-      '<div class="vscore ' + bandCls + '">' + esc(sig.composite===null?'--':sig.composite.toFixed(0)) +
-        '<span>/100</span></div>' +
-      '<div class="vtext">' +
-        '<div class="vband">' + tag(band, bandCls) +
-          '<span class="vplain">' + esc(plainVerdict) + '</span></div>' +
-        '<div class="vsub">' + esc(a.headline) + '</div>' +
-      '</div>' +
-      '<div class="vmeta"><div class="lbl">Data coverage</div>' +
-        '<div class="num" style="font-size:18px">' + esc(sig.coverage.toFixed(0)) + '%</div>' +
-        '<div class="faint" style="font-size:9.5px">' + sig.inputsPresent + '/' + sig.inputsTotal + ' inputs</div></div>' +
+      '<div class="vtop">' +
+        '<div class="vscore ' + bandCls + '">' + esc(sig.composite===null?'--':sig.composite.toFixed(0)) +
+          '<span>/100</span></div>' +
+        '<div class="vtext">' +
+          '<div class="vband">' + tag(band, bandCls) +
+            '<span class="vplain">' + esc(plainVerdict) + '</span></div>' +
+          '<div class="vsub">' + esc(a.headline) + '</div>' +
+        '</div>' +
+        '<div class="vmeta"><div class="lbl">Data coverage</div>' +
+          '<div class="num" style="font-size:22px">' + esc(sig.coverage.toFixed(0)) + '%</div>' +
+          '<div class="faint" style="font-size:10.5px">' + sig.inputsPresent + '/' + sig.inputsTotal + ' inputs</div></div>' +
+      '</div>' + fbars +
     '</div>' +
     panel('What the price model says',
       '<div class="prose">'+esc(a.valuation)+'</div>',
@@ -2376,13 +2408,18 @@ function viewLocalAssessment(m){
           : '')) +
     '</div>' +
     '<div class="grid g2">' +
-      panel('What would have to change',
+      panel('What would move it most',
         (a.levers.length
-          ? '<ul class="findings">' + a.levers.slice(0,8).map(function(x){
+          ? '<ul class="findings">' + a.levers.slice(0, State.showAll?12:4).map(function(x){
               return '<li><span class="mk o">→</span><span><span class="pl">'+esc(x.plain)+'</span>' +
                 '<span class="tech">worth '+x.pts+' pts in '+esc(x.factor)+'</span></span></li>';
-            }).join('') + '</ul>'
-          : '<div class="faint" style="font-size:11px">every test it can be scored on already passes</div>')) +
+            }).join('') + '</ul>' +
+            (a.levers.length>4 && !State.showAll
+              ? '<div class="row" style="margin-top:10px">' +
+                btn('toggleAll','Show '+(a.levers.length-4)+' more','ghost') + '</div>'
+              : '')
+          : '<div class="faint" style="font-size:11px">every test it can be scored on already passes</div>'),
+        '<span class="faint mono" style="font-size:11px">ranked by points</span>') +
       panel('Data gaps',
         (a.gaps.length
           ? '<ul class="bullets prose">' + a.gaps.map(function(x){ return '<li>'+esc(x)+'</li>'; }).join('') + '</ul>'
@@ -2712,6 +2749,9 @@ function viewSettings(){
 
 /* ---- root view ---- */
 function view(){
+  /* Key entry is a screen you can ask for, not a wall you hit. With no key the
+     boot sequence drops you into the demo instead. */
+  if(State.wantSetup && !FINNHUB_KEY) return viewSetup();
   if(!FINNHUB_KEY && !State.demo) return viewSetup();
 
   var body;
@@ -2739,10 +2779,10 @@ function view(){
   var demoBar = State.demo
     ? '<div class="demobar">' +
         '<span class="tag warn">demo</span>' +
-        '<span>Real ' + esc(State.ticker) + ' data captured ' + esc(CFG.DEMO ? CFG.DEMO.asOf : '') +
-        '. Every feature works — prices are frozen and the ticker search is disabled.</span>' +
+        '<span><b>You are seeing real ' + esc(State.ticker) + ' data from ' + esc(CFG.DEMO ? CFG.DEMO.asOf : '') + '.</b> ' +
+        'Everything works. To search any other ticker with live prices, add a free key — it takes a minute.</span>' +
         '<div class="sp"></div>' +
-        btn('exitDemo','Use live data with my own key','ghost') +
+        btn('wantSetup','Add free key','primary') +
       '</div>'
     : '';
 
@@ -2994,7 +3034,9 @@ var ACT = {
   },
 
   toggleAll: function(){ State.showAll = !State.showAll; set({}); },
-  demo: function(){ loadDemo(); },
+  demo: function(){ State.wantSetup = false; loadDemo(); },
+  wantSetup: function(){ State.wantSetup = true; render(); },
+  cancelSetup: function(){ State.wantSetup = false; render(); },
   exitDemo: function(){
     State.demo = false;
     State.metrics = null; State.quote = null; State.profile = null;
@@ -3332,8 +3374,14 @@ if(window.addEventListener) window.addEventListener('hashchange', function(){
   if(h && h !== State.tab) set({tab:h});
 });
 restore();
-render();
-if(FINNHUB_KEY) fetchTicker(State.ticker).then(function(){ fetchWatchlist(); startLive(); });
+if(FINNHUB_KEY){
+  render();
+  fetchTicker(State.ticker).then(function(){ fetchWatchlist(); startLive(); });
+} else if(CFG.DEMO){
+  loadDemo();            /* renders; no network, no gate, works instantly */
+} else {
+  render();
+}
 
 })();
 </script>
