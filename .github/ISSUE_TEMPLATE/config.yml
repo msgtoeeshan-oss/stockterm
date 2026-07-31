@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
   - name: Security concern
-    url: https://github.com/YOUR-USERNAME/stockterm/blob/main/SECURITY.md
+    url: https://github.com/msgtoeeshan-oss/stockterm/blob/main/SECURITY.md
     about: Read this first if it involves an API key
   - name: Contributing guide
-    url: https://github.com/YOUR-USERNAME/stockterm/blob/main/CONTRIBUTING.md
+    url: https://github.com/msgtoeeshan-oss/stockterm/blob/main/CONTRIBUTING.md
     about: The constraints a change has to respect
