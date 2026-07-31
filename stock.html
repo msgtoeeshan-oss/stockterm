@@ -157,12 +157,29 @@ input:focus{border-color:var(--accent);outline:none}
 .findings .pl{display:block;font-family:var(--sans);font-size:14px;line-height:1.45;color:var(--text)}
 .findings .tech{display:block;font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-top:3px}
 
-/* ── lens picker ───────────────────────────────────────────────── */
-.lens-row{display:flex;gap:4px;flex-wrap:wrap}
-.lens-b{font-family:var(--sans);font-size:11.5px;font-weight:600;padding:6px 13px;
-  background:var(--panel-2);border:1px solid var(--line-2);color:var(--dim);border-radius:2px}
+/* ── research mode picker ──────────────────────────────────────── */
+.lens-row{display:flex;gap:6px;flex-wrap:wrap}
+.lens-b{font-family:var(--sans);font-size:12.5px;font-weight:600;padding:9px 17px;
+  background:var(--panel-2);border:1px solid var(--line-2);color:var(--dim);border-radius:var(--r-pill)}
 .lens-b:hover{color:var(--text);border-color:var(--dim)}
-.lens-b.on{background:#26527f;border-color:#3f83d6;color:#fff}
+.lens-b.on{background:var(--grad);border-color:transparent;color:#fff}
+.qlist{margin:10px 0 0;padding-left:20px;color:var(--faint);font-size:12px;line-height:1.65}
+.qlist li{margin-bottom:2px}
+
+/* ── cited answers ─────────────────────────────────────────────── */
+.qa-wrap{display:flex;flex-direction:column;gap:16px}
+.qa{border-left:2px solid var(--line-2);padding-left:16px}
+.qa.nf{border-left-color:var(--warn)}
+.qa-q{display:flex;gap:9px;align-items:baseline;font-family:var(--sans);font-size:13px;
+  font-weight:650;color:var(--text);margin-bottom:7px}
+.qa-n{flex:none;width:21px;height:21px;border-radius:50%;background:var(--panel-2);
+  border:1px solid var(--line-2);color:var(--violet);font-size:11px;font-weight:700;
+  display:flex;align-items:center;justify-content:center}
+.qa-a{font-family:var(--sans);font-size:13.5px;line-height:1.65;color:#c9c6d8}
+.qa-c{margin-top:9px;font-family:var(--mono);font-size:11px;line-height:1.7;color:var(--faint);
+  background:var(--well);border:1px solid var(--line);border-radius:8px;padding:9px 12px;
+  overflow-x:auto;white-space:pre-wrap;word-break:break-word}
+.qa-c.nf-tag{color:var(--warn);white-space:normal}
 
 /* ── call-to-action bar ────────────────────────────────────────── */
 .cta{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:12px 0;padding:18px 22px;
@@ -314,7 +331,7 @@ var CFG = {
      2.5-flash serves fine. Change AI_MODEL if that ever flips. */
   AI_MODEL: 'gemini-2.5-flash',
   AI: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
-  AI_MAX_TOKENS: 2400,
+  AI_MAX_TOKENS: 6000,   /* 8 cited answers need far more room than a summary */
   AI_LABEL: 'Google Gemini 2.5 Flash',
   LS_DATA: 'stockterm.data.v2',
   LS_KEYS: 'stockterm.keys.v1',   /* browser storage only — never the file */
@@ -340,21 +357,82 @@ var CFG = {
     {min:-Infinity, label:'AVOID', cls:'neg'}
   ],
 
-  /* Analysis lenses. These swap the model's priorities and starting
-     assumptions — they do NOT train it, and they add no predictive power.
-     The guardrails below (reason only from supplied data, name gaps, no
-     recommendations) are appended to every one of them. */
-  LENSES: [
-    {id:'balanced', label:'Balanced', desc:'Weighs price, growth, quality and balance sheet evenly.',
-     persona:'You are a generalist buy-side analyst. Weigh valuation, growth, profitability and balance-sheet strength evenly, and say which of the four is doing the most work in your conclusion.'},
-    {id:'value', label:'Value', desc:'Price paid and downside first; sceptical of growth stories.',
-     persona:'You are a value analyst in the Graham tradition. Start from what the buyer is paying for existing assets and current earnings, and from what could go wrong. Treat projected growth as the least reliable input in the data. State the downside before the upside.'},
-    {id:'quality', label:'Quality', desc:'Durability of returns and margins over cheapness.',
-     persona:'You are a long-horizon quality analyst. Prioritise durability of returns on capital, margin stability and cash conversion over cheapness. A high multiple is not automatically a problem; deteriorating unit economics is. Say explicitly whether the data shows economics improving or eroding.'},
-    {id:'risk', label:'Risk-first', desc:'Actively hunts for what breaks the story.',
-     persona:'You are a short-side risk analyst. Your job is to find what breaks this. Lead with the bear case, stress the balance sheet and cash conversion hardest, and treat the bull case as carrying the burden of proof. Do not soften findings.'}
+  /* Rules prepended to EVERY research mode. Quote-first sourcing: the model
+     may only assert what it can cite from the evidence pack, and must say so
+     plainly when it cannot. */
+  RULES:
+    'CRITICAL RULES — FOLLOW THESE IN EVERY RESPONSE\n\n' +
+    '1. SOURCE DISCIPLINE\n' +
+    '   - Use ONLY the SOURCES block below as your evidence base.\n' +
+    '   - For every factual claim, financial metric or KPI you cite, you MUST first give the exact\n' +
+    '     source id and value, then your interpretation.\n' +
+    '     Format: [SOURCE-ID, field]: exact value -> then your claim.\n' +
+    '   - If you cannot find a supporting value in SOURCES, do NOT make the claim.\n' +
+    '     State: "Not found in sources." and add the item to notFound.\n' +
+    '   - Never use general knowledge, training data, or assumptions to fill gaps. You may know\n' +
+    '     things about this company from training. Do not use them. If it is not in SOURCES it\n' +
+    '     does not exist for this task.\n' +
+    '   - A claim counts as sourced only if the SPECIFIC fact appears in SOURCES. Naming products,\n' +
+    '     brands, customers, geographies, segments, competitors or strategy is NOT supported by a\n' +
+    '     company name or an industry label. If SOURCES gives only a name and an industry, then the\n' +
+    '     honest answer to "what does the company do" is that industry label and nothing more —\n' +
+    '     say so and mark it notFound. Citing [PROFILE, name] to justify a product description is\n' +
+    '     a violation of this rule.\n' +
+    '   - Before writing each answer, check every noun in it against SOURCES. If you cannot point\n' +
+    '     to the line it came from, delete it.\n\n' +
+    '2. DATA RECENCY\n' +
+    '   - Always use the most recent period present in SOURCES.\n' +
+    '   - If you rely on an older period, flag it explicitly in recencyNote:\n' +
+    '     "(Note: using FY#### data — more recent figures not found in sources.)"\n\n' +
+    '3. TRANSPARENCY\n' +
+    '   - If a question cannot be fully answered from SOURCES, say so in that answer.\n' +
+    '   - Mark any interpretation that goes beyond a cited number as (inferred from [SOURCE-ID])\n' +
+    '     and list it in inferences. Never present an inference as a fact.\n' +
+    '   - Issue no buy or sell recommendation.\n\n' +
+    '4. WRITING STYLE\n' +
+    '   - Plain English, short sentences. No buzzwords, no macro speculation.\n' +
+    '   - Explain any unavoidable jargon in the same sentence.\n',
+
+  /* Research modes. Each is a fixed question set answered in order. */
+  MODES: [
+    {id:'lynch', label:'Lynch Pitch', desc:'Why would I own this stock? Common-sense reasoning, one main idea.',
+     role:'You are a long-term equity analyst covering [TICKER]. Write a short investment pitch explaining why this could be a good stock to own, using simple common-sense reasoning.',
+     questions:[
+       'In one sentence, what does the company do?',
+       'What is the simple reason this stock could work? State ONE main idea. No stories. One reason.',
+       'How does the company actually make money?',
+       'What does the balance sheet look like today? (debt, cash, cash flow, downside survival — state which period)',
+       'What kind of company is this? Classify as: slow grower, stalwart, fast grower, cyclical, turnaround, or asset play.',
+       'What could go wrong?',
+       'Why might the market be missing this?',
+       'Bottom line, 3-4 sentences: why it is interesting, what must go right, and what would make you wrong.'
+     ]},
+    {id:'munger', label:'Munger Invert', desc:'How could I lose money? Assumes the idea is bad and tries to invalidate it.',
+     role:'You are a long-term equity analyst covering [TICKER]. Write a short investment memo that ASSUMES this is a bad long-term investment. Your goal is to invalidate the idea. Direct, skeptical tone.',
+     questions:[
+       'What is the most likely way an investor could lose money here?',
+       'Where is the business structurally weak?',
+       'What assumptions need to go right — and might not?',
+       'What could permanently impair earnings or cash flow?',
+       'Is the balance sheet a hidden risk?',
+       'Where could management hurt shareholders?',
+       'Why might investors be fooling themselves?',
+       'What evidence would prove this bear case right?'
+     ]},
+    {id:'business', label:'Business Brief', desc:'What the filings actually say about how this company works.',
+     role:'You are a long-term equity analyst covering [TICKER]. Describe how this business actually works and what its reported numbers show, without arguing a side.',
+     questions:[
+       'In one sentence, what does the company do?',
+       'What do revenue and profit look like over the reported history, and what direction are they moving?',
+       'How profitable is it, and is that improving or eroding?',
+       'How much cash does the business actually generate versus report as profit?',
+       'What does the balance sheet look like today?',
+       'What has changed most in the last two reported years?',
+       'What do the sources NOT tell you that a serious analyst would need?',
+       'Bottom line, 3-4 sentences: what kind of business the numbers describe.'
+     ]}
   ],
-  DEF_LENS: 'balanced',
+  DEF_MODE: 'lynch',
 
   DEF_WEIGHTS: {valuation:25, growth:25, quality:25, balance:25},
   DEF_DCF:     {growth:8, fade:10, terminal:2.5, discount:9},
@@ -522,7 +600,7 @@ var State = {
   tab:     CFG.DEF_TAB,
   weights: Object.assign({}, CFG.DEF_WEIGHTS),
   dcf:     Object.assign({}, CFG.DEF_DCF),
-  lens:    CFG.DEF_LENS,
+  mode:    CFG.DEF_MODE,
 
   /* runtime only — never persisted */
   loading:   false,
@@ -532,6 +610,7 @@ var State = {
   profile:   null,
   metric:    null,
   annuals:   [],
+  filings:   [],
   metrics:   null,
   watch:     [],
   watchState:'idle',
@@ -550,7 +629,7 @@ var Draft = {ticker:'', finnhub:'', ai:''};
 
 function persist(){
   Store.set(CFG.LS_DATA, JSON.stringify({
-    ticker:State.ticker, tab:State.tab, weights:State.weights, dcf:State.dcf, lens:State.lens
+    ticker:State.ticker, tab:State.tab, weights:State.weights, dcf:State.dcf, mode:State.mode
   }));
 }
 /* #overview / #signal / #valuation / #thesis / #settings — deep-linkable tabs. */
@@ -575,7 +654,7 @@ function restore(){
     if(d.dcf) Object.keys(CFG.DEF_DCF).forEach(function(k){
       var v=num(d.dcf[k]); if(v!==null) State.dcf[k]=v;
     });
-    if(d.lens && CFG.LENSES.some(function(l){return l.id===d.lens})) State.lens = d.lens;
+    if(d.mode && CFG.MODES.some(function(l){return l.id===d.mode})) State.mode = d.mode;
   }catch(e){}
   /* Keys live in browser storage, loaded into the module vars at boot. The
      in-file constants act only as an optional local override. */
@@ -683,9 +762,10 @@ function loadAll(sym){
     fhGet('/quote',                     {symbol:sym}),
     fhGet('/stock/profile2',            {symbol:sym}),
     fhGet('/stock/metric',              {symbol:sym, metric:'all'}),
-    fhGet('/stock/financials-reported', {symbol:sym, freq:'annual'})
+    fhGet('/stock/financials-reported', {symbol:sym, freq:'annual'}),
+    fhGet('/stock/filings',             {symbol:sym})
   ]).then(function(res){
-    var warn = [], out = {quote:null, profile:null, metric:null, annuals:[]};
+    var warn = [], out = {quote:null, profile:null, metric:null, annuals:[], filings:[]};
     var qOk=false, mOk=false;
 
     if(res[0].status==='fulfilled' && res[0].value && num(res[0].value.c)!==null){
@@ -712,6 +792,15 @@ function loadAll(sym){
       if(!out.annuals.length) warn.push('Annual financials returned no usable statements for ' + sym + '. History charts, revenue CAGR, EPS growth and margin trend will be unavailable.');
     } else {
       warn.push('Annual financials: ' + (res[3].reason ? res[3].reason.message : 'failed.') + ' History charts and trend factors will be unavailable.');
+    }
+
+    /* Filing index: gives every citation a real sec.gov document to point at.
+       Optional — its absence weakens sourcing but breaks nothing. */
+    if(res[4].status==='fulfilled' && Array.isArray(res[4].value)){
+      out.filings = res[4].value;
+    } else {
+      warn.push('SEC filing index: ' + (res[4].reason ? res[4].reason.message : 'no data returned.') +
+                ' Research citations will name the fiscal year but cannot link the source document.');
     }
 
     out.warnings = warn;
@@ -794,34 +883,121 @@ function refreshQuote(){
   }).catch(function(){});
 }
 
+/* Build the evidence base the model is allowed to quote. Every line carries a
+   bracketed id so a claim can be traced back to a specific filing field. The
+   as-reported rows already hold {concept,label,value} per fiscal year, which
+   is what makes real citation possible rather than vague attribution. */
+function buildEvidence(m){
+  var L = [], srcs = [];
+  var fy = function(y){ return 'FILING-FY' + y; };
+
+  /* filings index -> real sec.gov documents backing each fiscal year */
+  var byYear = {};
+  (State.filings||[]).forEach(function(f){
+    if(!f || String(f.form||'').indexOf('10-K')!==0) return;
+    var y = String(f.filedDate||'').slice(0,4);
+    if(y && !byYear[y]) byYear[y] = f;
+  });
+
+  L.push('SOURCES — this is your complete evidence base. Cite by bracketed id.');
+  L.push('');
+
+  m.years.slice().reverse().forEach(function(y){
+    var id = fy(y.year);
+    /* a 10-K is filed the year after the FY ends for most filers; try both */
+    var doc = byYear[String(+y.year+1)] || byYear[y.year] || null;
+    srcs.push({id:id, year:y.year, form:'10-K', url:doc?doc.reportUrl:'', filed:doc?String(doc.filedDate).slice(0,10):''});
+    L.push('[' + id + '] ' + (m.name||State.ticker) + ' annual report, fiscal year ' + y.year +
+           (doc ? '  (10-K filed ' + String(doc.filedDate).slice(0,10) + ')' : '') );
+    if(doc && doc.reportUrl) L.push('  document: ' + doc.reportUrl);
+    var f = [
+      ['us-gaap:Revenues', y.revenue],
+      ['us-gaap:GrossProfit', y.grossProfit],
+      ['us-gaap:OperatingIncomeLoss', y.opIncome],
+      ['us-gaap:NetIncomeLoss', y.netIncome],
+      ['us-gaap:EarningsPerShareDiluted', y.eps],
+      ['us-gaap:NetCashProvidedByOperatingActivities', y.cfo],
+      ['us-gaap:PaymentsToAcquirePropertyPlantAndEquipment', y.capex],
+      ['derived:FreeCashFlow (cfo - |capex|)', y.fcf],
+      ['derived:GrossMarginPct', y.grossMargin],
+      ['derived:OperatingMarginPct', y.opMargin],
+      ['derived:NetMarginPct', y.netMargin]
+    ];
+    f.forEach(function(p){ if(p[1]!==null && p[1]!==undefined) L.push('  ' + p[0] + ' = ' + p[1]); });
+    L.push('');
+  });
+
+  L.push('[METRIC] Finnhub key metrics for ' + State.ticker + ' (vendor-computed, trailing twelve months unless noted)');
+  var mk = [
+    ['peTTM', m.pe], ['psTTM', m.psTTM], ['pbQuarterly', m.pb], ['beta', m.beta],
+    ['dividendYieldIndicatedAnnualPct', m.divYield], ['roeTTMPct', m.roe], ['roiTTMPct', m.roi],
+    ['currentRatioQuarterly', m.currentRatio], ['totalDebtToTotalEquityQuarterly', m.de],
+    ['grossMarginTTMPct', m.grossMargin], ['operatingMarginTTMPct', m.opMargin],
+    ['netProfitMarginTTMPct', m.netMargin], ['revenueGrowthTTMYoyPct', m.revGrowth],
+    ['week52High', m.wk52High], ['week52Low', m.wk52Low],
+    ['marketCapitalization', m.marketCap], ['sharesOutstanding', m.shares],
+    ['revenueTTMDerived', m.revenueTTM]
+  ];
+  mk.forEach(function(p){ if(p[1]!==null && p[1]!==undefined) L.push('  ' + p[0] + ' = ' + p[1]); });
+  srcs.push({id:'METRIC', year:'', form:'Finnhub key metrics', url:'', filed:''});
+  L.push('');
+
+  L.push('[QUOTE] Market quote for ' + State.ticker + ', exchange timestamp ' + tsFmt(m.quoteTime) +
+         ' (' + agoStr(m.quoteTime) + ')');
+  L.push('  price = ' + m.price);
+  if(m.changePct!==null) L.push('  changePct = ' + m.changePct);
+  L.push('  currency = ' + m.currency);
+  srcs.push({id:'QUOTE', year:'', form:'Market quote', url:'', filed:''});
+  L.push('');
+
+  if(m.exchange || m.industry){
+    L.push('[PROFILE] Company profile');
+    if(m.name)     L.push('  name = ' + m.name);
+    if(m.exchange) L.push('  exchange = ' + m.exchange);
+    if(m.industry) L.push('  finnhubIndustry = ' + m.industry);
+    srcs.push({id:'PROFILE', year:'', form:'Company profile', url:'', filed:''});
+    L.push('');
+  }
+
+  L.push('NOT IN SOURCES — you have no data on any of the following, so you may not comment on them:');
+  L.push('  segment or geographic breakdowns, unit volumes, customer concentration, management');
+  L.push('  commentary or MD&A text, competitors, market share, guidance, analyst estimates,');
+  L.push('  share count history, buybacks, dividends paid, total debt or cash balances,');
+  L.push('  the narrative sections of any filing. Only the numeric fields above are available.');
+
+  return {text:L.join('\n'), sources:srcs};
+}
+
 /* --- Gemini thesis call ------------------------------------------------- */
-function apiThesis(payload){
+function apiThesis(evidence){
+  var mode = CFG.MODES.filter(function(x){ return x.id===State.mode; })[0] || CFG.MODES[0];
+  var qs = mode.questions.map(function(q,i){ return (i+1) + '. ' + q; }).join('\n');
+
+  var prompt =
+    'ROLE\n' + mode.role.replace('[TICKER]', State.ticker) + '\n\n' +
+    CFG.RULES + '\n' +
+    'TASK\nAnswer these questions, in this order. Do not add, merge, reorder or skip any.\n\n' + qs + '\n\n' +
+    evidence.text + '\n\n' +
+    'OUTPUT\nRaw JSON only — no markdown fences, no preamble. Schema:\n' +
+    '{"answers":[{"n":number,"answer":string,"citations":[string],"notFound":boolean}],' +
+    '"bottomLine":string,"notFound":[string],"inferences":[string],"recencyNote":string}\n\n' +
+    'answers must contain exactly ' + mode.questions.length + ' items, n = 1..' + mode.questions.length + '.\n' +
+    'Each citations entry must be formatted "[SOURCE-ID, field]: value" using ids from SOURCES above.\n' +
+    'Set notFound true for any question SOURCES cannot answer, and say so in the answer text.\n' +
+    'recencyNote: the most recent fiscal year you used, and a flag if you had to fall back to older data.';
+
   return fetch(CFG.AI + '?key=' + encodeURIComponent(AI_KEY), {
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify({
-      contents:[{parts:[{text:
-        /* Lens sets the priorities; the guardrails after it are fixed and
-           apply to every lens. */
-        (function(){
-          var l = CFG.LENSES.filter(function(x){ return x.id===State.lens; })[0] || CFG.LENSES[0];
-          return l.persona + ' ';
-        })() +
-        'You are reviewing computed metrics. Reason only from the data given; ' +
-        'if something is not in the data, say the data does not show it. Do not fill gaps with outside ' +
-        'knowledge and do not give buy or sell recommendations. Respond with raw JSON only — ' +
-        'no markdown fences, no preamble.\nData: ' + JSON.stringify(payload) + '\n' +
-        'Schema: {"thesis":string,"bullCase":[string],"bearCase":[string],' +
-        '"keyRisks":[{"risk":string,"severity":"high"|"medium"|"low"}],' +
-        '"moat":{"assessment":string,"strength":"wide"|"narrow"|"none"},"dataGaps":[string],' +
-        '"whatWouldChangeMyMind":[string],"convictionScore":number,"convictionReasoning":string}\n' +
-        '3-5 items per array. convictionScore 1-10 reflecting evidence strength, not enthusiasm.'
-      }]}],
+      contents:[{parts:[{text: prompt}]}],
       /* 2.5 is a thinking model and reasoning tokens count against
          maxOutputTokens — without this the budget is spent before any JSON
          is emitted and the response comes back truncated. */
+      /* Quote-first answers run long; 2400 was sized for the old summary
+         schema. Thinking stays off — reasoning tokens count against the cap. */
       generationConfig:{maxOutputTokens: CFG.AI_MAX_TOKENS, responseMimeType:'application/json',
-                        thinkingConfig:{thinkingBudget:0}}
+                        temperature:0.2, thinkingConfig:{thinkingBudget:0}}
     })
   })
   .catch(function(){ throw new ApiErr(netMsg('generativelanguage.googleapis.com'), 0); })
@@ -1955,25 +2131,27 @@ function viewThesis(m){
   }
 
   var t = State.thesis;
-  var curLens = CFG.LENSES.filter(function(x){ return x.id===State.lens; })[0] || CFG.LENSES[0];
-  var lensPicker = '<div class="lens">' +
-      '<div class="lbl" style="margin-bottom:4px">Analysis lens — changes what the model prioritises</div>' +
-      '<div class="lens-row">' + CFG.LENSES.map(function(l){
-        return '<button type="button" class="lens-b'+(l.id===State.lens?' on':'')+'" data-act="lens" data-lens="'+attr(l.id)+'" ' +
+  var curMode = CFG.MODES.filter(function(x){ return x.id===State.mode; })[0] || CFG.MODES[0];
+  var modePicker = '<div class="lens">' +
+      '<div class="lbl" style="margin-bottom:6px">Research mode — a fixed question set, answered in order</div>' +
+      '<div class="lens-row">' + CFG.MODES.map(function(l){
+        return '<button type="button" class="lens-b'+(l.id===State.mode?' on':'')+'" data-act="mode" data-mode="'+attr(l.id)+'" ' +
           'title="'+attr(l.desc)+'">'+esc(l.label)+'</button>';
       }).join('') + '</div>' +
-      '<div class="faint" style="font-size:11px;margin-top:5px">'+esc(curLens.desc)+'</div>' +
+      '<div class="faint" style="font-size:12px;margin-top:7px">'+esc(curMode.desc)+'</div>' +
+      '<ol class="qlist">' + curMode.questions.map(function(q){ return '<li>'+esc(q)+'</li>'; }).join('') + '</ol>' +
     '</div>';
 
-  var head = lensPicker + '<div class="row" style="margin:8px 0 6px">' +
+  var head = modePicker + '<div class="row" style="margin:12px 0 6px">' +
     btn('thesis', t.status==='loading'?'Generating…':'Generate thesis', 'primary', t.status==='loading'?'disabled':'') +
     (t.at ? '<span class="faint mono" style="font-size:9.5px">generated '+esc(t.at)+'</span>' : '') +
     '<div class="sp"></div>' +
     '<span class="faint mono" style="font-size:9.5px">'+esc(CFG.AI_LABEL)+'</span></div>' +
-    '<div class="faint" style="font-size:10.5px;line-height:1.5">' +
-    'The model is given only the figures this terminal computed and is instructed to reason from them alone, ' +
-    'to name gaps rather than fill them, and not to issue recommendations. It can still be wrong. Read it as a checklist, not a verdict. ' +
-    '<b>A lens changes which questions get asked of the same numbers — it does not train the model and adds no ability to predict prices.</b></div>';
+    '<div class="faint" style="font-size:11.5px;line-height:1.55">' +
+    'Every claim must cite a source id and value from the evidence pack, or be marked ' +
+    '<span class="mono">Not found in sources</span>. The model is told its own training knowledge does not count. ' +
+    'Interpretations beyond a cited number are flagged as inferences. ' +
+    '<b>A mode changes which questions get asked of the same filings — it does not train the model and adds no ability to predict prices.</b></div>';
 
   if(t.status==='loading')
     return localPart + panel('Model thesis', head + note('Working', '<span class="spin"></span> Sending metrics and waiting for the response…', 'acc'));
@@ -1983,7 +2161,56 @@ function viewThesis(m){
     return localPart + panel('Model thesis', head + '<div class="faint mono" style="font-size:10.5px;padding:14px 0;text-align:center">' +
       'No model thesis generated for ' + esc(State.ticker) + ' yet — the assessment above needs no model.</div>');
 
+  /* ---- cited-answer rendering (research framework) ---- */
   var d = t.data;
+  if(d && Array.isArray(d.answers)){
+    var qs = curMode.questions;
+    var ev = State.evidence || {sources:[]};
+
+    var qaHtml = d.answers.map(function(a){
+      var n = num(a.n); var idx = (n===null?0:n) - 1;
+      var q = qs[idx] || ('Question ' + (n||'?'));
+      var cites = asArr(a.citations).filter(function(c){ return String(c||'').trim(); });
+      return '<div class="qa' + (a.notFound?' nf':'') + '">' +
+        '<div class="qa-q"><span class="qa-n">' + esc(String(n||'?')) + '</span>' + esc(q) + '</div>' +
+        '<div class="qa-a">' + esc(a.answer || '—') + '</div>' +
+        (cites.length
+          ? '<div class="qa-c">' + cites.map(function(c){
+              return '<div>' + esc(typeof c==='string'?c:JSON.stringify(c)) + '</div>'; }).join('') + '</div>'
+          : (a.notFound ? '<div class="qa-c nf-tag">Not found in sources</div>' : '')) +
+      '</div>';
+    }).join('');
+
+    var srcRows = (ev.sources||[]).map(function(s){
+      return '<tr><td class="mono acc">['+esc(s.id)+']</td>' +
+        '<td>'+esc(s.form)+(s.year?' FY'+esc(s.year):'')+'</td>' +
+        '<td class="dim">'+esc(s.filed||'—')+'</td>' +
+        '<td>'+(s.url?'<a href="'+attr(s.url)+'" target="_blank" rel="noopener noreferrer">sec.gov document</a>':'<span class="faint">no document link</span>')+'</td></tr>';
+    }).join('');
+
+    return localPart +
+      panel(curMode.label + ' — ' + State.ticker, head) +
+      panel('Answers', '<div class="qa-wrap">' + qaHtml + '</div>' +
+        (d.bottomLine ? '<div class="hr"></div><div class="lbl" style="margin-bottom:5px">Bottom line</div>' +
+          '<div class="prose">'+esc(d.bottomLine)+'</div>' : ''),
+        '<span class="faint mono" style="font-size:11px">' + d.answers.length + ' of ' + qs.length + ' answered</span>') +
+      '<div class="grid g2">' +
+        panel('Not found in sources',
+          (asArr(d.notFound).length ? bullets(d.notFound)
+            : '<div class="prose">The model reported no unanswerable items.</div>') +
+          '<div class="faint" style="font-size:11px;margin-top:8px">What it could not answer is more useful than what it could.</div>') +
+        panel('Marked as inference',
+          (asArr(d.inferences).length ? bullets(d.inferences)
+            : '<div class="prose">No interpretations were flagged as going beyond a cited number.</div>')) +
+      '</div>' +
+      (d.recencyNote ? note('Data recency','<div class="prose">'+esc(d.recencyNote)+'</div>','warn') : '') +
+      panelT('Sources the model was given',
+        '<div class="scroll"><table class="tbl"><thead><tr><th>ID</th><th>Document</th><th>Filed</th><th>Verify</th></tr></thead><tbody>' +
+        srcRows + '</tbody></table></div>',
+        '<span class="faint mono" style="font-size:11px">nothing outside this list was available to it</span>');
+  }
+
+  /* ---- legacy summary schema (older cached responses) ---- */
   var conv = num(d.convictionScore);
   var convCls = conv===null?'':(conv>=7?'pos':(conv>=4?'warn':'neg'));
   var rank = {high:0, medium:1, low:2};
@@ -2285,10 +2512,10 @@ var ACT = {
   tabSettings: function(){ setHash('settings'); set({tab:'settings'}); },
   goAnalysis: function(){ setHash('thesis'); set({tab:'thesis'}); },
   tabSignal: function(){ setHash('signal'); set({tab:'signal'}); },
-  lens: function(el){
-    var id = el.getAttribute('data-lens');
-    if(!CFG.LENSES.some(function(l){ return l.id===id; })) return;
-    State.lens = id;
+  mode: function(el){
+    var id = el.getAttribute('data-mode');
+    if(!CFG.MODES.some(function(l){ return l.id===id; })) return;
+    State.mode = id;
     /* A previous thesis was written under a different lens — drop it rather
        than leave stale output sitting under a new label. */
     if(State.thesis.status==='done') State.thesis = {status:'idle', data:null, error:'', at:''};
@@ -2360,57 +2587,16 @@ var ACT = {
     if(!m){ toast('load a ticker first'); return; }
     if(!AI_KEY){ set({tab:'settings'}); return; }
 
-    var sig = runSignal(m, State.weights);
-    var dcf = runDcf(m, State.dcf);
-
-    var payload = {
-      ticker: State.ticker,
-      company: {name:m.name, exchange:m.exchange, industry:m.industry, currency:m.currency},
-      quote: {price:m.price, changePct:m.changePct, week52High:m.wk52High, week52Low:m.wk52Low, asOf:tsFmt(m.quoteTime)},
-      size: {marketCap:m.marketCap, sharesOutstanding:m.shares, revenueTTM:m.revenueTTM, freeCashFlow:m.latestFcf, fcfSource:m.latestFcfSource},
-      valuation: {peTTM:m.pe, priceToSales:m.priceToSales, pbQuarterly:m.pb, fcfYieldPct:m.fcfYield, beta:m.beta, dividendYieldPct:m.divYield},
-      growth: {revenueGrowthTTMYoyPct:m.revGrowth, revenueCagrPct:m.revenueCagr, epsGrowthPct:m.epsGrowth, yearsOfHistory:m.years.length},
-      quality: {grossMarginPct:m.grossMargin, operatingMarginPct:m.opMargin, netMarginPct:m.netMargin, roePct:m.roe, roiPct:m.roi, opMarginTrendPP:m.marginTrend},
-      balance: {debtToEquity:m.de, currentRatio:m.currentRatio},
-      annualHistory: m.years.map(function(y){
-        return {fy:y.year, revenue:y.revenue, grossProfit:y.grossProfit, operatingIncome:y.opIncome,
-                netIncome:y.netIncome, eps:y.eps, cfo:y.cfo, capex:y.capex, freeCashFlow:y.fcf,
-                grossMarginPct:y.grossMargin, operatingMarginPct:y.opMargin, netMarginPct:y.netMargin};
-      }),
-      signalEngine: {
-        compositeScore: sig.composite,
-        band: sig.band ? sig.band.label : null,
-        dataCoveragePct: sig.coverage,
-        factorsDroppedForMissingData: sig.factors.filter(function(f){return !f.included}).map(function(f){return f.label}),
-        factors: sig.factors.map(function(f){
-          return {factor:f.label, score:f.score, weight:f.weight, includedInComposite:f.included,
-                  inputsPresent:f.present, inputsTotal:f.inputs, missingInputs:f.missing,
-                  rules:f.trace.map(function(r){ return {rule:r.label, result:r.status, valueTested:r.value, pointsEarned:r.earned, pointsPossible:r.pts}; })};
-        })
-      },
-      dcf: dcf.error ? {error:dcf.error} : {
-        assumptions: dcf.assumptions,
-        intrinsicValuePerShare: dcf.perShare,
-        marginOfSafetyPct: dcf.mos,
-        terminalValueShareOfEVPct: dcf.tvShare,
-        note: 'No net-debt bridge: enterprise value is divided by share count directly.'
-      },
-      notes: [
-        'All figures were computed by the client from Finnhub endpoints. Nothing else is available to you.',
-        'null means the data was unavailable, not zero.',
-        'Percent fields are already in percent units.',
-        'Annual statement line items were matched on concept-name substrings and may be mislabelled for some filers.'
-      ]
-    };
-
+    var evidence = buildEvidence(m);
+    State.evidence = evidence;
     State.thesis = {status:'loading', data:null, error:'', at:''};
     render();
 
-    apiThesis(payload).then(function(data){
+    apiThesis(evidence).then(function(data){
       State.thesis = {status:'done', data:data, error:'', at: nowStamp()};
       render();
     }).catch(function(err){
-      State.thesis = {status:'error', data:null, error:(err && err.message) || 'Thesis request failed.', at:''};
+      State.thesis = {status:'error', data:null, error:(err && err.message) || 'Research request failed.', at:''};
       render();
     });
   },
@@ -2546,7 +2732,49 @@ function buildMarkdown(){
   }
 
   var t = State.thesis;
-  if(t.status==='done' && t.data){
+  /* New cited-answer schema: export the questions, answers and their sources
+     so the memo is verifiable away from the app. */
+  if(t.status==='done' && t.data && Array.isArray(t.data.answers)){
+    var d = t.data;
+    var mode = CFG.MODES.filter(function(x){ return x.id===State.mode; })[0] || CFG.MODES[0];
+    L.push('## ' + mode.label + ' — ' + State.ticker);
+    L.push('');
+    L.push('_Generated by ' + CFG.AI_LABEL + '. Every claim is cited to the evidence pack below; ' +
+           'anything uncited was refused as "not found in sources"._');
+    L.push('');
+    d.answers.forEach(function(a){
+      var i = (num(a.n)||0) - 1;
+      L.push('### ' + (a.n||'?') + '. ' + (mode.questions[i] || ''));
+      L.push('');
+      L.push(String(a.answer||'—'));
+      L.push('');
+      asArr(a.citations).forEach(function(c){ L.push('> `' + String(c) + '`'); });
+      if(a.notFound) L.push('> **Not found in sources.**');
+      L.push('');
+    });
+    if(d.bottomLine){ L.push('**Bottom line** — ' + String(d.bottomLine)); L.push(''); }
+    if(asArr(d.notFound).length){
+      L.push('**Not found in sources**'); L.push('');
+      asArr(d.notFound).forEach(function(x){ L.push('- ' + String(x)); });
+      L.push('');
+    }
+    if(asArr(d.inferences).length){
+      L.push('**Marked as inference**'); L.push('');
+      asArr(d.inferences).forEach(function(x){ L.push('- ' + String(x)); });
+      L.push('');
+    }
+    if(d.recencyNote){ L.push('**Data recency** — ' + String(d.recencyNote)); L.push(''); }
+    var ev = State.evidence;
+    if(ev && ev.sources && ev.sources.length){
+      L.push('**Sources supplied to the model**'); L.push('');
+      L.push('| ID | Document | Filed | Link |'); L.push('|---|---|---|---|');
+      ev.sources.forEach(function(s){
+        L.push('| `[' + s.id + ']` | ' + s.form + (s.year?' FY'+s.year:'') + ' | ' + (s.filed||'—') +
+               ' | ' + (s.url ? s.url : '—') + ' |');
+      });
+      L.push('');
+    }
+  } else if(t.status==='done' && t.data){
     var d = t.data;
     L.push('## Thesis (' + CFG.AI_LABEL + ')');
     L.push('');
