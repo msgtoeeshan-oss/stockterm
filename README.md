@@ -6,15 +6,23 @@ It scores a company against rules you control, shows the full audit trace behind
 
 ---
 
-## Quick start
+## Try it
 
-1. Download **`stock.html`**
-2. Open it in a browser (double-click is fine — no server needed)
-3. Paste a free [Finnhub](https://finnhub.io/register) API key when prompted
+**[▶ Open the live demo](https://YOUR-USERNAME.github.io/stockterm/)** — no signup, no install, no key. Real Apple data is bundled in, so every tab works immediately.
 
-That's it. The key is stored in your browser's `localStorage` and never written back into the file.
+To use it on any ticker with live prices:
 
-Optionally add a [Google AI Studio](https://aistudio.google.com/apikey) key in **Settings** to enable the model-written thesis. Everything else works without it.
+1. Get a free key at [finnhub.io/register](https://finnhub.io/register) (takes a minute, no card)
+2. Paste it into the app
+3. Done — it's remembered on your device
+
+The key lives in your browser's `localStorage` and is **never** written into the file or sent anywhere except Finnhub. That's why this repo is safe to be public.
+
+Optionally add a [Google AI Studio](https://aistudio.google.com/apikey) key in **Settings** to enable the sourced research pass. Everything else works without it.
+
+### Or run it offline
+
+Download `stock.html` and double-click. One file, no server, no build step. It works the same.
 
 ---
 
@@ -105,6 +113,28 @@ The script is divided into 12 numbered sections with a map in the header comment
 Scoring rules live in `CFG.FACTORS` in section 1. Each carries its threshold, point value, the metric keys it needs, and a plain-English description. Add or change rules there and the trace, the assessment and the export all follow automatically.
 
 ---
+
+## Hosting your own copy
+
+The whole app is one static file, so GitHub Pages serves it for free with no build step.
+
+1. Push this repo to GitHub as **Public**
+2. **Settings → Pages → Source: Deploy from a branch**
+3. Branch **`main`**, folder **`/ (root)`**, then **Save**
+4. Wait about a minute — your link is `https://YOUR-USERNAME.github.io/REPO-NAME/`
+
+`index.html` is a copy of `stock.html`, which is what makes the bare URL work. If you edit the app, copy it across again:
+
+```bash
+cp stock.html index.html
+git commit -am "update" && git push
+```
+
+### A note on data sources
+
+Finnhub is used because it sends `Access-Control-Allow-Origin: *`, which is what lets a page with no backend call it directly.
+
+Yahoo Finance (and therefore `yfinance`) **cannot** work here. Its endpoints return data but send no CORS headers at all, so a browser blocks the response regardless of where the page is hosted, and the richer endpoints return `401` without a server-side cookie/crumb handshake. Using Yahoo requires a backend — which would mean hosting costs and your key paying for every visitor's usage.
 
 ## Security
 
