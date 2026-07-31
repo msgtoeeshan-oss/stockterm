@@ -1,0 +1,2602 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>STOCKTERM — Equity Analysis Terminal</title>
+<style>
+/* ── design tokens ─────────────────────────────────────────────── */
+:root{
+  --bg:#0a0813;        --panel:#14121f;     --panel-2:#1b1829;
+  --well:#0d0b16;      --line:#272238;      --line-2:#372f4d;
+  --text:#eef0f7;      --dim:#9a94b0;       --faint:#6a6482;
+  --pos:#34d399;       --neg:#fb7185;       --warn:#fbbf24;
+  --accent:#8b7cf6;    --accent-2:#ec4899;  --violet:#a78bfa;   --tag:#fbbf24;
+  --grad:linear-gradient(120deg,#8b7cf6,#ec4899);
+  --r:16px;            --r-sm:11px;         --r-pill:999px;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono","Courier New",monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;line-height:1.5;
+     -webkit-font-smoothing:antialiased;min-height:100vh}
+/* ambient glow, fixed so it never scrolls or costs layout */
+body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(58% 42% at 12% 0%,rgba(139,124,246,.20),transparent 62%),
+             radial-gradient(48% 38% at 92% 4%,rgba(236,72,153,.13),transparent 60%)}
+#root{position:relative;z-index:1}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+h1,h2,h3{margin:0;font-weight:600}
+p{margin:0 0 7px}
+::selection{background:rgba(74,144,226,.3)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+.mono,.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.pos{color:var(--pos)} .neg{color:var(--neg)} .warn{color:var(--warn)}
+.acc{color:var(--accent)} .vio{color:var(--violet)}
+.dim{color:var(--dim)} .faint{color:var(--faint)}
+.lbl{font-family:var(--sans);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim);font-weight:600}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.sp{flex:1}
+.wrap{max-width:1360px;margin:0 auto;padding:6px 18px 60px}
+.hr{height:1px;background:var(--line);border:0;margin:14px 0}
+
+/* ── header ────────────────────────────────────────────────────── */
+.hdr{padding-top:14px}
+.hdr-in{max-width:1360px;margin:0 auto;padding:0 18px 12px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:9px;white-space:nowrap}
+.logo .mk{width:30px;height:30px;border-radius:9px;background:var(--grad);display:flex;
+  align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff;flex:none}
+.logo b{font-size:17px;font-weight:700;letter-spacing:-.02em;color:var(--text);font-family:var(--sans)}
+.logo em{display:none}
+.search{flex:1;min-width:180px;max-width:340px;position:relative}
+/* must out-specify the global input[type=text] rule further down the sheet */
+.hdr .search input[type=text]{width:100%;background:var(--panel-2);border:1px solid var(--line);
+  color:var(--text);font-family:var(--sans);font-size:13px;padding:10px 14px 10px 34px;border-radius:var(--r-pill)}
+.hdr .search input[type=text]::placeholder{color:var(--faint)}
+.hdr .search input[type=text]:focus{border-color:var(--accent);background:var(--panel)}
+.search svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);opacity:.65}
+.hdr .go{background:var(--grad);border:0;color:#fff;font-family:var(--sans);font-size:12.5px;
+  font-weight:600;padding:10px 20px;border-radius:var(--r-pill);cursor:pointer}
+.hdr .go:hover{filter:brightness(1.12)}
+.hdr .go.alt{background:var(--panel-2);border:1px solid var(--line-2);color:var(--dim)}
+.hdr .go.alt:hover{color:var(--text);border-color:var(--accent);filter:none}
+.hdr .go[disabled]{opacity:.5;cursor:not-allowed}
+
+/* ── nav pills ─────────────────────────────────────────────────── */
+.nav{max-width:1360px;margin:0 auto;padding:0 18px 4px}
+.nav-in{display:flex;align-items:center;gap:5px;overflow-x:auto;scrollbar-width:none}
+.nav-in::-webkit-scrollbar{display:none}
+.nav-i{font-family:var(--sans);font-size:13px;font-weight:500;color:var(--dim);background:transparent;
+  border:0;border-radius:var(--r-pill);padding:9px 16px;cursor:pointer;white-space:nowrap}
+.nav-i:hover{background:var(--panel-2);color:var(--text)}
+.nav-i.on{background:var(--panel-2);color:var(--text);box-shadow:inset 0 0 0 1px var(--line-2)}
+.clock{font-family:var(--sans);font-size:11.5px;color:var(--faint);padding:0 8px;white-space:nowrap}
+
+/* ── buttons / inputs ──────────────────────────────────────────── */
+button{font-family:var(--sans);font-size:12px;font-weight:600;
+  background:var(--panel-2);color:var(--text);border:1px solid var(--line-2);
+  padding:8px 15px;border-radius:var(--r-pill);cursor:pointer;transition:border-color .15s,color .15s}
+button:hover:not([disabled]){border-color:var(--accent);color:#fff}
+button.primary{background:var(--grad);border:0;color:#fff}
+button.primary:hover:not([disabled]){filter:brightness(1.12)}
+button.danger:hover:not([disabled]){border-color:var(--neg);color:var(--neg)}
+button.ghost{background:transparent;color:var(--dim)}
+button[disabled]{opacity:.45;cursor:not-allowed}
+input[type=text],input[type=password]{font-family:var(--mono);font-size:13px;background:var(--well);
+  color:var(--text);border:1px solid var(--line-2);padding:10px 13px;border-radius:var(--r-sm);width:100%}
+input:focus{border-color:var(--accent);outline:none}
+
+/* ── panels ────────────────────────────────────────────────────── */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);margin:12px 0;overflow:hidden}
+.panel-h{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  padding:14px 18px 0}
+.panel-h h2{font-family:var(--sans);font-size:13.5px;font-weight:600;letter-spacing:-.01em;color:var(--text)}
+.panel-b{padding:14px 18px 18px}
+.panel-b.tight{padding:10px 0 0}
+.panel-b.pad4{padding:10px}
+
+.grid{display:grid;gap:12px}
+@media(min-width:940px){
+  .g2{grid-template-columns:1fr 1fr}
+  .g32{grid-template-columns:1.3fr 1fr}
+  .g23{grid-template-columns:1fr 1.55fr}
+}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+.card{background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:13px 15px}
+.card .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:21px;margin-top:5px;letter-spacing:-.03em}
+.card .s{font-size:10.5px;color:var(--faint);margin-top:3px}
+
+/* ── quote strip ───────────────────────────────────────────────── */
+.quote{display:flex;gap:28px;align-items:flex-end;flex-wrap:wrap;padding:20px 22px}
+.q-sym{font-family:var(--sans);font-size:26px;font-weight:700;letter-spacing:-.03em}
+.q-px{font-family:var(--mono);font-size:44px;line-height:1;letter-spacing:-.045em;font-variant-numeric:tabular-nums}
+.q-ch{font-family:var(--mono);font-size:14px;font-variant-numeric:tabular-nums;margin-top:5px}
+.q-meta{display:flex;gap:22px;flex-wrap:wrap}
+.q-meta>div{min-width:62px}
+.q-meta .v{font-family:var(--mono);font-size:14px;font-variant-numeric:tabular-nums;margin-top:3px}
+.rangebar{position:relative;height:6px;background:var(--well);border:1px solid var(--line);
+  border-radius:var(--r-pill);margin-top:8px;min-width:150px}
+.rangebar i{position:absolute;top:-3px;width:3px;height:10px;background:var(--tag);border-radius:2px}
+
+/* ── factor bars ───────────────────────────────────────────────── */
+.breadth{border:1px solid var(--line);background:var(--panel);padding:14px 16px;border-radius:var(--r-sm)}
+.breadth-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+  font-size:12px;font-weight:600;margin-bottom:9px}
+.breadth-h .c{color:var(--faint);font-size:10.5px;text-transform:uppercase;letter-spacing:.07em}
+.breadth-b{display:flex;height:7px;background:var(--well);border-radius:var(--r-pill);overflow:hidden}
+.breadth-b i{display:block;height:100%}
+.breadth-b i.g{background:var(--pos)}
+.breadth-b i.r{background:rgba(251,113,133,.35)}
+.breadth-b i.o{background:var(--line-2)}
+
+/* ── verdict header (Analysis tab) ─────────────────────────────── */
+.verdict{display:flex;align-items:center;gap:26px;flex-wrap:wrap;margin:12px 0;padding:26px 28px;
+  background:linear-gradient(120deg,rgba(139,124,246,.16),rgba(236,72,153,.09)),var(--panel);
+  border:1px solid var(--line-2);border-radius:var(--r)}
+.vscore{font-family:var(--mono);font-size:68px;line-height:.95;letter-spacing:-.055em;font-variant-numeric:tabular-nums}
+.vscore span{font-size:19px;color:var(--faint);letter-spacing:0}
+.vtext{flex:1;min-width:280px}
+.vband{display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-bottom:8px}
+.vplain{font-family:var(--sans);font-size:19px;font-weight:650;letter-spacing:-.02em;color:var(--text)}
+.vsub{font-family:var(--sans);font-size:13px;line-height:1.55;color:var(--dim)}
+.vmeta{text-align:right;min-width:96px}
+
+/* findings list: plain sentence first, the rule underneath */
+.findings{list-style:none;margin:0;padding:0}
+.findings li{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--line)}
+.findings li:last-child{border-bottom:0}
+.findings .mk{flex:none;width:22px;height:22px;border-radius:7px;display:flex;align-items:center;
+  justify-content:center;font-size:12px;font-weight:700;margin-top:1px}
+.findings .mk.y{background:rgba(52,211,153,.16);color:var(--pos)}
+.findings .mk.n{background:rgba(251,113,133,.16);color:var(--neg)}
+.findings .mk.o{background:var(--panel-2);color:var(--dim)}
+.findings .pl{display:block;font-family:var(--sans);font-size:14px;line-height:1.45;color:var(--text)}
+.findings .tech{display:block;font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-top:3px}
+
+/* ── lens picker ───────────────────────────────────────────────── */
+.lens-row{display:flex;gap:4px;flex-wrap:wrap}
+.lens-b{font-family:var(--sans);font-size:11.5px;font-weight:600;padding:6px 13px;
+  background:var(--panel-2);border:1px solid var(--line-2);color:var(--dim);border-radius:2px}
+.lens-b:hover{color:var(--text);border-color:var(--dim)}
+.lens-b.on{background:#26527f;border-color:#3f83d6;color:#fff}
+
+/* ── call-to-action bar ────────────────────────────────────────── */
+.cta{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:12px 0;padding:18px 22px;
+  background:linear-gradient(120deg,rgba(139,124,246,.18),rgba(236,72,153,.10)),var(--panel);
+  border:1px solid var(--line-2);border-radius:var(--r)}
+.cta .t{font-family:var(--sans);font-size:15px;font-weight:650;letter-spacing:-.015em;color:var(--text)}
+.cta .s{font-family:var(--sans);font-size:12.5px;color:var(--dim);margin-top:3px}
+.cta button{background:var(--grad);border:0;color:#fff;font-size:12.5px;padding:10px 18px}
+.cta button:hover{filter:brightness(1.12);color:#fff}
+.cta button.ghost{background:var(--panel-2);border:1px solid var(--line-2);color:var(--dim)}
+.cta button.ghost:hover{color:var(--text);filter:none}
+
+/* ── heatmap tiles ─────────────────────────────────────────────── */
+.heat{display:grid;grid-template-columns:repeat(auto-fill,minmax(94px,1fr));gap:8px}
+.heat button{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  border:1px solid var(--line);padding:15px 5px;border-radius:var(--r-sm);background:var(--panel-2);cursor:pointer;gap:3px}
+.heat button:hover{border-color:var(--line-2);transform:translateY(-1px)}
+.heat .t{font-family:var(--sans);font-size:13px;font-weight:700;color:#fff;letter-spacing:-.01em}
+.heat .p{font-family:var(--mono);font-size:11.5px;color:rgba(255,255,255,.94);font-variant-numeric:tabular-nums}
+
+/* ── tables ────────────────────────────────────────────────────── */
+.tbl{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px;font-variant-numeric:tabular-nums}
+.tbl th{text-align:left;color:var(--dim);font-family:var(--sans);font-weight:600;font-size:10.5px;
+  letter-spacing:.07em;text-transform:uppercase;padding:9px 18px;background:transparent;
+  border-bottom:1px solid var(--line)}
+.tbl td{padding:10px 18px;border-bottom:1px solid var(--line)}
+.tbl tbody tr:hover{background:var(--panel-2)}
+.tbl tr:last-child td{border-bottom:0}
+.tbl .n{text-align:right}
+.tbl tr.off td{color:var(--faint)}
+.tbl a.tk{font-weight:600;color:var(--violet)}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.scroll-y{max-height:340px;overflow-y:auto}
+
+/* ── tags / notes ──────────────────────────────────────────────── */
+.tag{font-family:var(--sans);font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+  padding:4px 11px;border-radius:var(--r-pill);border:1px solid var(--line-2);color:var(--dim);white-space:nowrap}
+.tag.pos{color:#04231a;background:var(--pos);border-color:var(--pos)}
+.tag.neg{color:#2a0910;background:var(--neg);border-color:var(--neg)}
+.tag.warn{color:#291c02;background:var(--warn);border-color:var(--warn)}
+.tag.acc{color:#fff;background:var(--grad);border-color:transparent}
+.note{border:1px solid var(--line);border-left:3px solid var(--dim);background:var(--panel-2);
+  padding:13px 16px;border-radius:var(--r-sm);margin:12px 0;font-size:13px}
+.note.warn{border-left-color:var(--warn)} .note.neg{border-left-color:var(--neg)}
+.note.acc{border-left-color:var(--accent)}
+.note b{font-family:var(--sans);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;
+  display:block;margin-bottom:5px;color:var(--dim)}
+
+/* ── sliders ───────────────────────────────────────────────────── */
+.sld{margin:12px 0}
+.sld-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.sld-h .v{font-family:var(--mono);font-size:14px;color:var(--violet);font-variant-numeric:tabular-nums;font-weight:600}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;background:transparent;
+  height:22px;padding:0;border:0;margin:5px 0 0;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:5px;background:var(--line-2);border-radius:99px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;
+  background:#fff;border:0;margin-top:-6px;box-shadow:0 0 0 4px rgba(139,124,246,.35)}
+input[type=range]::-moz-range-track{height:5px;background:var(--line-2);border-radius:99px}
+input[type=range]::-moz-range-thumb{width:17px;height:17px;border:0;border-radius:50%;background:#fff;
+  box-shadow:0 0 0 4px rgba(139,124,246,.35)}
+
+/* ── sensitivity grid ──────────────────────────────────────────── */
+.sens td,.sens th{text-align:center;padding:9px 6px;font-size:12px}
+.sens td{border:1px solid var(--line);border-radius:6px}
+.sens td.hi{background:rgba(52,211,153,.15);color:var(--pos)}
+.sens td.lo{background:rgba(251,113,133,.15);color:var(--neg)}
+.sens td.cur{outline:2px solid var(--violet);outline-offset:-2px;font-weight:700}
+.sens td.na{color:var(--faint)}
+
+.chart{width:100%;height:auto;display:block}
+.chart text{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+.prose{font-family:var(--sans);font-size:13.5px;line-height:1.65;color:#c9c6d8}
+.bullets{margin:0;padding-left:18px}
+.bullets li{margin-bottom:7px}
+
+/* ── first-run setup ───────────────────────────────────────────── */
+.setup{max-width:560px;margin:7vh auto;padding:0 20px}
+.setup-card{background:var(--panel);border:1px solid var(--line-2);border-radius:var(--r);padding:30px}
+.steps{counter-reset:s;list-style:none;padding:0;margin:20px 0}
+.steps li{counter-increment:s;position:relative;padding:0 0 18px 40px}
+.steps li::before{content:counter(s);position:absolute;left:0;top:-1px;width:25px;height:25px;border-radius:50%;
+  background:var(--panel-2);border:1px solid var(--line-2);color:var(--violet);
+  font-family:var(--sans);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.spin{display:inline-block;width:8px;height:8px;border:1.5px solid var(--line-2);
+  border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-1px}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+@media(max-width:640px){
+  .wrap{padding:6px 6px 40px}
+  .q-px{font-size:25px}
+  .quote{gap:12px}
+  .logo b{font-size:18px}
+  .logo em{display:none}
+  .cards{grid-template-columns:repeat(auto-fill,minmax(108px,1fr))}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;
+    transition-duration:.001ms!important;scroll-behavior:auto!important}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+/* =========================================================================
+   STOCKTERM — single file, zero dependencies, no build step.
+
+   SECTION MAP  (say "edit section N")
+     1  CONFIG        API KEYS, factor rules, weights, bands, tabs, watchlist
+     2  UTILITIES     number parsing, formatting, HTML escaping, heat colours
+     3  STATE         one store object, set(), localStorage persistence
+     4  API           Finnhub fetches, watchlist, Gemini thesis, error mapping
+     5  METRICS       derived figures (CAGR, margins, FCF yield, ...)
+     6  SIGNAL ENGINE weighted factor scoring + full audit trace
+     7  DCF           fading-growth model, Gordon TV, sensitivity grid
+     8  CHARTS        hand-rolled SVG: comboChart(), radarChart()
+     9  COMPONENTS    HTML-string builders (breadth bars, heat tiles, tables)
+    10  VIEWS         one function per tab
+    11  RENDER+EVENTS single render pass, delegation, focus/caret restore
+    12  ACTIONS       load, watchlist refresh, thesis, export, resets
+
+   Not investment advice. See the disclaimer in Settings.
+   ========================================================================= */
+(function(){
+'use strict';
+
+/* ==========================================================================
+   1  CONFIG
+   ========================================================================== */
+
+/* ---- API KEYS -----------------------------------------------------------
+   THESE STAY EMPTY. This file is meant to be publishable.
+
+   Keys are entered once in the app and kept in this browser's localStorage.
+   They are never written back into this file, so the file can live in a
+   public repo without leaking anything.
+
+   Do not "temporarily" paste a key below to save a step. If the file is ever
+   committed with a key in it, git history keeps that key forever — deleting
+   it in a later commit does not remove it.
+   ------------------------------------------------------------------------ */
+var FINNHUB_KEY = '';   /* required — free at finnhub.io/register */
+var AI_KEY      = '';   /* optional — powers the model section of Analysis */
+
+var CFG = {
+  FH: 'https://finnhub.io/api/v1',
+  /* gemini-2.0-flash reports free-tier quota "limit: 0" on this project;
+     2.5-flash serves fine. Change AI_MODEL if that ever flips. */
+  AI_MODEL: 'gemini-2.5-flash',
+  AI: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+  AI_MAX_TOKENS: 2400,
+  AI_LABEL: 'Google Gemini 2.5 Flash',
+  LS_DATA: 'stockterm.data.v2',
+  LS_KEYS: 'stockterm.keys.v1',   /* browser storage only — never the file */
+  LIVE_MS: 15000,          /* quote-only poll. 4 calls/min out of the 60 allowed. */
+
+  /* Analysis leads — it is the point of the app. Overview is reference data. */
+  TABS: [
+    {id:'thesis',    label:'Analysis'},
+    {id:'overview',  label:'Overview'},
+    {id:'valuation', label:'Valuation'},
+    {id:'signal',    label:'Rule trace'},
+    {id:'settings',  label:'Settings'}
+  ],
+  DEF_TAB: 'thesis',
+
+  /* Quote-only calls, one per symbol, for the heatmap and movers table. */
+  WATCHLIST: ['AAPL','MSFT','NVDA','GOOGL','AMZN','META','TSLA','AVGO','JPM','XOM','WMT','KO'],
+
+  BANDS: [
+    {min:72, label:'ACCUMULATE', cls:'pos'},
+    {min:52, label:'HOLD',       cls:'warn'},
+    {min:34, label:'TRIM',       cls:'warn'},
+    {min:-Infinity, label:'AVOID', cls:'neg'}
+  ],
+
+  /* Analysis lenses. These swap the model's priorities and starting
+     assumptions — they do NOT train it, and they add no predictive power.
+     The guardrails below (reason only from supplied data, name gaps, no
+     recommendations) are appended to every one of them. */
+  LENSES: [
+    {id:'balanced', label:'Balanced', desc:'Weighs price, growth, quality and balance sheet evenly.',
+     persona:'You are a generalist buy-side analyst. Weigh valuation, growth, profitability and balance-sheet strength evenly, and say which of the four is doing the most work in your conclusion.'},
+    {id:'value', label:'Value', desc:'Price paid and downside first; sceptical of growth stories.',
+     persona:'You are a value analyst in the Graham tradition. Start from what the buyer is paying for existing assets and current earnings, and from what could go wrong. Treat projected growth as the least reliable input in the data. State the downside before the upside.'},
+    {id:'quality', label:'Quality', desc:'Durability of returns and margins over cheapness.',
+     persona:'You are a long-horizon quality analyst. Prioritise durability of returns on capital, margin stability and cash conversion over cheapness. A high multiple is not automatically a problem; deteriorating unit economics is. Say explicitly whether the data shows economics improving or eroding.'},
+    {id:'risk', label:'Risk-first', desc:'Actively hunts for what breaks the story.',
+     persona:'You are a short-side risk analyst. Your job is to find what breaks this. Lead with the bear case, stress the balance sheet and cash conversion hardest, and treat the bull case as carrying the burden of proof. Do not soften findings.'}
+  ],
+  DEF_LENS: 'balanced',
+
+  DEF_WEIGHTS: {valuation:25, growth:25, quality:25, balance:25},
+  DEF_DCF:     {growth:8, fade:10, terminal:2.5, discount:9},
+
+  /* Every rule declares the metric keys it needs. A rule whose inputs are
+     missing is never scored — neither earned nor possible — so absent data
+     can never read as bad data. */
+  FACTORS: [
+    { id:'valuation', label:'Valuation', plain:'Is the price reasonable for what you get?', color:'--accent', rules:[
+      {id:'pe20',  label:'P/E < 20',            plain:'Costs under 20x its annual profit',            pts:40, needs:['pe'],           test:function(m){return m.pe<20},              show:function(m){return fx(m.pe,1)+'x'}},
+      {id:'pe35',  label:'P/E 20 - 35',         plain:'Costs 20-35x its annual profit',               pts:20, needs:['pe'],           test:function(m){return m.pe>=20&&m.pe<=35},   show:function(m){return fx(m.pe,1)+'x'}},
+      {id:'fcfy',  label:'FCF yield > 4%',      plain:'Returns over 4% of its price as cash each year',pts:35, needs:['fcfYield'],     test:function(m){return m.fcfYield>4},         show:function(m){return fx(m.fcfYield,2)+'%'}},
+      {id:'ps6',   label:'P/S < 6',             plain:'Costs under 6x its annual sales',              pts:25, needs:['priceToSales'], test:function(m){return m.priceToSales<6},     show:function(m){return fx(m.priceToSales,2)+'x'}}
+    ]},
+    { id:'growth', label:'Growth', plain:'Is the business getting bigger?', color:'--violet', rules:[
+      /* plain: must read correctly after both "It ..." and "If it ..." — keep every one verb-initial */
+      {id:'rg15',  label:'Rev growth > 15%',    plain:'Grows sales faster than 15% a year',           pts:40, needs:['revGrowth'],    test:function(m){return m.revGrowth>15},       show:function(m){return fx(m.revGrowth,1)+'%'}},
+      {id:'rg5',   label:'Rev growth 5 - 15%',  plain:'Grows sales a steady 5-15% a year',            pts:20, needs:['revGrowth'],    test:function(m){return m.revGrowth>=5&&m.revGrowth<=15}, show:function(m){return fx(m.revGrowth,1)+'%'}},
+      {id:'cagr',  label:'Rev CAGR > 10%',      plain:'Has compounded sales over 10% a year',         pts:30, needs:['revenueCagr'],  test:function(m){return m.revenueCagr>10},     show:function(m){return fx(m.revenueCagr,1)+'%'}},
+      {id:'eps',   label:'EPS growth > 0',      plain:'Earns more per share than it did last year',   pts:30, needs:['epsGrowth'],    test:function(m){return m.epsGrowth>0},        show:function(m){return fx(m.epsGrowth,1)+'%'}}
+    ]},
+    { id:'quality', label:'Quality', plain:'Is it a good business, regardless of price?', color:'--pos', rules:[
+      {id:'gm40',  label:'Gross margin > 40%',  plain:'Keeps over 40c of every sales dollar after production',pts:30, needs:['grossMargin'],  test:function(m){return m.grossMargin>40},     show:function(m){return fx(m.grossMargin,1)+'%'}},
+      {id:'om15',  label:'Op margin > 15%',     plain:'Keeps over 15c of every sales dollar after running costs',pts:25, needs:['opMargin'],     test:function(m){return m.opMargin>15},        show:function(m){return fx(m.opMargin,1)+'%'}},
+      {id:'roe15', label:'ROE > 15%',           plain:'Earns over 15% on shareholder money',          pts:25, needs:['roe'],          test:function(m){return m.roe>15},             show:function(m){return fx(m.roe,1)+'%'}},
+      {id:'mexp',  label:'Margins expanding',   plain:'Runs wider margins now than at the start of the record',pts:20, needs:['marginTrend'],  test:function(m){return m.marginTrend>0},      show:function(m){return sgn(m.marginTrend,1)+'pp'}}
+    ]},
+    { id:'balance', label:'Balance sheet', plain:'Can it survive a bad year?', color:'--warn', rules:[
+      {id:'de1',   label:'D/E < 1.0',           plain:'Owes less than shareholders have put in',      pts:40, needs:['de'],           test:function(m){return m.de<1},               show:function(m){return fx(m.de,2)+'x'}},
+      {id:'de2',   label:'D/E 1.0 - 2.0',       plain:'Owes 1-2x what shareholders have put in',      pts:15, needs:['de'],           test:function(m){return m.de>=1&&m.de<=2},     show:function(m){return fx(m.de,2)+'x'}},
+      {id:'cr15',  label:'Current ratio > 1.5', plain:'Holds 1.5x the cash and stock needed for near-term bills',pts:30, needs:['currentRatio'], test:function(m){return m.currentRatio>1.5},   show:function(m){return fx(m.currentRatio,2)+'x'}},
+      {id:'fcfp',  label:'FCF > 0',             plain:'Generates cash rather than burning it',        pts:30, needs:['latestFcf'],    test:function(m){return m.latestFcf>0},        show:function(m){return money(m.latestFcf)}}
+    ]}
+  ],
+
+  // Substring matchers for financials-reported. Case-insensitive, first hit wins.
+  FIN: {
+    revenue:     ['revenuefromcontract','totalrevenue','revenues','netsales','revenue'],
+    netIncome:   ['netincomeloss','netincome'],
+    grossProfit: ['grossprofit'],
+    opIncome:    ['operatingincomeloss','operatingincome'],
+    eps:         ['earningspersharediluted','earningspersharebasic'],
+    cfo:         ['netcashprovidedbyusedinoperating','operatingactivities'],
+    capex:       ['paymentstoacquirepropertyplant','capitalexpenditure']
+  }
+};
+
+/* ==========================================================================
+   2  UTILITIES
+   ========================================================================== */
+
+/* Everything that reaches innerHTML goes through esc(). API responses are
+   untrusted: a company name is attacker-controllable in principle. */
+function esc(v){
+  if(v===null||v===undefined) return '';
+  return String(v)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function attr(v){ return esc(v); }
+
+/* Strict numeric coercion. Returns null for anything not finite — never NaN,
+   never 0-as-a-stand-in-for-missing. */
+function num(v){
+  if(v===null||v===undefined||v==='') return null;
+  if(typeof v==='number') return isFinite(v)?v:null;
+  var n = parseFloat(String(v).replace(/[, ]/g,''));
+  return isFinite(n)?n:null;
+}
+function has(o,k){ return o && o[k]!==null && o[k]!==undefined && isFinite(o[k]); }
+
+function fx(v,d){ v=num(v); return v===null?'--':v.toFixed(d===undefined?2:d); }
+function sgn(v,d){ v=num(v); if(v===null) return '--'; return (v>0?'+':'')+v.toFixed(d===undefined?2:d); }
+function pct(v,d){ v=num(v); return v===null?'--':v.toFixed(d===undefined?1:d)+'%'; }
+function pctS(v,d){ v=num(v); return v===null?'--':(v>0?'+':'')+v.toFixed(d===undefined?1:d)+'%'; }
+
+function money(v,cur){
+  v=num(v); if(v===null) return '--';
+  var s = v<0?'-':'', a=Math.abs(v), u='', d=2;
+  if(a>=1e12){a/=1e12;u='T';} else if(a>=1e9){a/=1e9;u='B';}
+  else if(a>=1e6){a/=1e6;u='M';} else if(a>=1e3){a/=1e3;u='K';}
+  if(a>=100) d=1;
+  return s+(cur?curSym(cur):'')+a.toFixed(d)+u;
+}
+function px(v,cur){ v=num(v); return v===null?'--':(cur?curSym(cur):'')+v.toFixed(2); }
+function curSym(c){
+  var m={USD:'$',EUR:'€',GBP:'£',JPY:'¥',CAD:'C$',AUD:'A$',CHF:'CHF ',INR:'₹',HKD:'HK$'};
+  return m[c] || (c?c+' ':'');
+}
+function cls(v){ v=num(v); return v===null?'':(v>0?'pos':(v<0?'neg':'')); }
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function tsFmt(t){
+  if(!t) return '--';
+  try { return new Date(t*1000).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'}); }
+  catch(e){ return String(t); }
+}
+function nowStamp(){ try{ return new Date().toLocaleString(); }catch(e){ return ''; } }
+
+/* How stale is this number, in plain words. The app never implies data is
+   fresher than the exchange timestamp it came with. */
+function agoStr(unixSec){
+  var t = num(unixSec); if(t===null||t<=0) return '';
+  var s = Math.floor(Date.now()/1000 - t);
+  if(s < 0) return 'just now';
+  if(s < 60) return s + 's ago';
+  if(s < 3600) return Math.floor(s/60) + 'm ago';
+  if(s < 86400) return Math.floor(s/3600) + 'h ago';
+  return Math.floor(s/86400) + 'd ago';
+}
+function isStale(unixSec, limitSec){
+  var t = num(unixSec); if(t===null||t<=0) return true;
+  return (Date.now()/1000 - t) > (limitSec||300);
+}
+
+/* Nav clock, e.g. "FRI JUL 31 2026  4:12 PM" */
+function clockStr(){
+  try{
+    var d = new Date();
+    var D = ['SUN','MON','TUE','WED','THU','FRI','SAT'][d.getDay()];
+    var M = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][d.getMonth()];
+    var h = d.getHours(), ap = h>=12?'PM':'AM'; h = h%12; if(h===0) h=12;
+    var mi = ('0'+d.getMinutes()).slice(-2);
+    return D+' '+M+' '+('0'+d.getDate()).slice(-2)+' '+d.getFullYear()+'  '+h+':'+mi+' '+ap;
+  }catch(e){ return ''; }
+}
+
+/* Heat tile colour: red at -3%, neutral at 0, green at +3%. */
+function heatColor(p){
+  var v = clamp(num(p)===null?0:num(p), -3, 3)/3;
+  if(Math.abs(v) < 0.03) return '#3a414d';
+  var a = (0.20 + 0.68*Math.abs(v)).toFixed(3);
+  return v>0 ? 'rgba(47,211,95,'+a+')' : 'rgba(244,82,95,'+a+')';
+}
+
+function normKey(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
+function asArr(v){ return Array.isArray(v) ? v : (v===null||v===undefined||v===''?[]:[v]); }
+
+/* Tolerant JSON extraction: strips code fences and any prose either side. */
+function parseLooseJson(text){
+  var s = String(text||'').trim();
+  s = s.replace(/```json/gi,'').replace(/```/g,'').trim();
+  var a = s.indexOf('{'), b = s.lastIndexOf('}');
+  if(a===-1||b<=a) throw new Error('Model did not return JSON.');
+  return JSON.parse(s.slice(a,b+1));
+}
+
+/* ==========================================================================
+   3  STATE
+   ========================================================================== */
+var Store = (function(){
+  var ok = true, mem = {};
+  try { window.localStorage.setItem('__t','1'); window.localStorage.removeItem('__t'); }
+  catch(e){ ok = false; }
+  return {
+    ok: ok,
+    get: function(k){ try{ return ok ? window.localStorage.getItem(k) : (mem[k]||null); }catch(e){ return null; } },
+    set: function(k,v){ try{ if(ok) window.localStorage.setItem(k,v); else mem[k]=v; }catch(e){} },
+    del: function(k){ try{ if(ok) window.localStorage.removeItem(k); else delete mem[k]; }catch(e){} }
+  };
+})();
+
+var State = {
+  /* persisted */
+  ticker:  'AAPL',
+  tab:     CFG.DEF_TAB,
+  weights: Object.assign({}, CFG.DEF_WEIGHTS),
+  dcf:     Object.assign({}, CFG.DEF_DCF),
+  lens:    CFG.DEF_LENS,
+
+  /* runtime only — never persisted */
+  loading:   false,
+  fatal:     null,
+  warnings:  [],
+  quote:     null,
+  profile:   null,
+  metric:    null,
+  annuals:   [],
+  metrics:   null,
+  watch:     [],
+  watchState:'idle',
+  live:      true,
+  lastPoll:  0,
+  thesis:    {status:'idle', data:null, error:'', at:''},
+  verify:    {status:'idle', msg:''},
+  verifyAi:  {status:'idle', msg:''},
+  showAll:   false,
+  toast:     ''
+};
+
+/* Uncommitted text-field contents. Text inputs never trigger a render, so
+   their live value lives here and views read from it. */
+var Draft = {ticker:'', finnhub:'', ai:''};
+
+function persist(){
+  Store.set(CFG.LS_DATA, JSON.stringify({
+    ticker:State.ticker, tab:State.tab, weights:State.weights, dcf:State.dcf, lens:State.lens
+  }));
+}
+/* #overview / #signal / #valuation / #thesis / #settings — deep-linkable tabs. */
+function tabFromHash(){
+  try{
+    var h = String((window.location && window.location.hash) || '').replace(/^#/,'').toLowerCase();
+    return CFG.TABS.some(function(t){ return t.id===h; }) ? h : null;
+  }catch(e){ return null; }
+}
+function setHash(id){
+  try{ if(window.location && window.location.hash !== '#'+id) window.location.hash = id; }catch(e){}
+}
+
+function restore(){
+  try{
+    var d = JSON.parse(Store.get(CFG.LS_DATA)||'{}');
+    if(d.ticker) State.ticker = String(d.ticker).toUpperCase();
+    if(d.tab && CFG.TABS.some(function(t){return t.id===d.tab})) State.tab = d.tab;
+    if(d.weights) Object.keys(CFG.DEF_WEIGHTS).forEach(function(k){
+      var v=num(d.weights[k]); if(v!==null) State.weights[k]=clamp(v,0,100);
+    });
+    if(d.dcf) Object.keys(CFG.DEF_DCF).forEach(function(k){
+      var v=num(d.dcf[k]); if(v!==null) State.dcf[k]=v;
+    });
+    if(d.lens && CFG.LENSES.some(function(l){return l.id===d.lens})) State.lens = d.lens;
+  }catch(e){}
+  /* Keys live in browser storage, loaded into the module vars at boot. The
+     in-file constants act only as an optional local override. */
+  try{
+    var k = JSON.parse(Store.get(CFG.LS_KEYS)||'{}');
+    if(!FINNHUB_KEY && typeof k.finnhub==='string') FINNHUB_KEY = k.finnhub;
+    if(!AI_KEY      && typeof k.ai==='string')      AI_KEY      = k.ai;
+  }catch(e){}
+
+  var h = tabFromHash();
+  if(h) State.tab = h;                 // an explicit #hash beats the saved tab
+  Draft.ticker = State.ticker;
+}
+function persistKeys(){
+  Store.set(CFG.LS_KEYS, JSON.stringify({finnhub:FINNHUB_KEY, ai:AI_KEY}));
+}
+
+/* Single mutation entry point. */
+function set(patch, opts){
+  opts = opts || {};
+  Object.keys(patch).forEach(function(k){ State[k] = patch[k]; });
+  if(!opts.noPersist) persist();
+  if(!opts.silent) render();
+}
+
+/* ==========================================================================
+   4  API
+   ========================================================================== */
+function ApiErr(msg, code){ this.name='ApiErr'; this.message=msg; this.code=code||0; }
+ApiErr.prototype = Object.create(Error.prototype);
+
+function statusMsg(code, what){
+  if(code===401||code===403) return 'Key rejected on ' + what + ' (HTTP ' + code + '). The key in section 1 of this file is wrong, revoked, or this endpoint is not on its plan.';
+  if(code===429) return 'Rate limited on ' + what + ' (HTTP 429). The Finnhub free tier allows 60 calls/minute. Wait a minute, then reload.';
+  if(code===404) return 'Not found on ' + what + ' (HTTP 404). Check the ticker symbol.';
+  if(code>=500)  return 'Finnhub server error on ' + what + ' (HTTP ' + code + '). Nothing wrong on your side — retry shortly.';
+  return 'Request to ' + what + ' failed (HTTP ' + code + ').';
+}
+function netMsg(what){
+  return 'Could not reach ' + what + '. Check your connection. An ad-blocker or privacy extension blocking the request is the usual cause when the page is opened from a file:// path.';
+}
+
+function fhGet(path, params){
+  if(!FINNHUB_KEY) return Promise.reject(new ApiErr('No Finnhub key set in section 1 of this file.',0));
+  var q = Object.keys(params||{}).map(function(k){
+    return encodeURIComponent(k)+'='+encodeURIComponent(params[k]);
+  });
+  q.push('token='+encodeURIComponent(FINNHUB_KEY));
+  var url = CFG.FH + path + '?' + q.join('&');
+  return fetch(url, {method:'GET', mode:'cors', cache:'no-store'})
+    .catch(function(){ throw new ApiErr(netMsg('finnhub.io'), 0); })
+    .then(function(r){
+      if(!r.ok) throw new ApiErr(statusMsg(r.status, path), r.status);
+      return r.json().catch(function(){ throw new ApiErr('Finnhub returned a malformed response for '+path+'.', 0); });
+    });
+}
+
+/* Parse one annual filing into a flat row. Field names vary by filer, so we
+   match case-insensitively on substrings; first hit wins. */
+function pickConcept(rows, keys){
+  if(!Array.isArray(rows)) return null;
+  for(var i=0;i<keys.length;i++){
+    for(var j=0;j<rows.length;j++){
+      var r = rows[j]; if(!r) continue;
+      if(normKey(r.concept).indexOf(keys[i])>=0 || normKey(r.label).indexOf(keys[i])>=0){
+        var v = num(r.value);
+        if(v!==null) return v;
+      }
+    }
+  }
+  return null;
+}
+function parseAnnuals(payload){
+  var data = (payload && Array.isArray(payload.data)) ? payload.data : [];
+  var rows = data.map(function(y){
+    var rep = y.report || {}, ic = rep.ic || [], cf = rep.cf || [];
+    var revenue = pickConcept(ic, CFG.FIN.revenue);
+    if(revenue===null) return null;                       // drop rows with no revenue
+    var cfo   = pickConcept(cf, CFG.FIN.cfo);
+    var capex = pickConcept(cf, CFG.FIN.capex);
+    var gross = pickConcept(ic, CFG.FIN.grossProfit);
+    var opInc = pickConcept(ic, CFG.FIN.opIncome);
+    var ni    = pickConcept(ic, CFG.FIN.netIncome);
+    return {
+      year: String(y.year || (y.endDate||'').slice(0,4) || ''),
+      revenue: revenue,
+      grossProfit: gross,
+      opIncome: opInc,
+      netIncome: ni,
+      eps: pickConcept(ic, CFG.FIN.eps),
+      cfo: cfo,
+      capex: capex,
+      fcf: (cfo!==null && capex!==null) ? cfo - Math.abs(capex) : null,
+      grossMargin: (gross!==null && revenue) ? gross/revenue*100 : null,
+      opMargin:    (opInc!==null && revenue) ? opInc/revenue*100 : null,
+      netMargin:   (ni!==null    && revenue) ? ni/revenue*100    : null
+    };
+  }).filter(Boolean);
+  return rows.reverse();                                  // oldest first
+}
+
+/* All four calls in flight at once; partial failure degrades to warnings. */
+function loadAll(sym){
+  return Promise.allSettled([
+    fhGet('/quote',                     {symbol:sym}),
+    fhGet('/stock/profile2',            {symbol:sym}),
+    fhGet('/stock/metric',              {symbol:sym, metric:'all'}),
+    fhGet('/stock/financials-reported', {symbol:sym, freq:'annual'})
+  ]).then(function(res){
+    var warn = [], out = {quote:null, profile:null, metric:null, annuals:[]};
+    var qOk=false, mOk=false;
+
+    if(res[0].status==='fulfilled' && res[0].value && num(res[0].value.c)!==null){
+      out.quote = res[0].value; qOk = num(out.quote.c)!==null && num(out.quote.c)!==0;
+      if(!qOk) warn.push('Quote came back empty for ' + sym + ' — that usually means the ticker is not recognised.');
+    } else {
+      warn.push('Quote: ' + (res[0].reason ? res[0].reason.message : 'failed.'));
+    }
+
+    if(res[1].status==='fulfilled' && res[1].value && Object.keys(res[1].value).length){
+      out.profile = res[1].value;
+    } else {
+      warn.push('Company profile: ' + (res[1].reason ? res[1].reason.message : 'no data returned. Market cap and share count will be missing.'));
+    }
+
+    if(res[2].status==='fulfilled' && res[2].value && res[2].value.metric){
+      out.metric = res[2].value.metric; mOk = true;
+    } else {
+      warn.push('Key metrics: ' + (res[2].reason ? res[2].reason.message : 'no data returned. Most ratios will be blank.'));
+    }
+
+    if(res[3].status==='fulfilled'){
+      out.annuals = parseAnnuals(res[3].value);
+      if(!out.annuals.length) warn.push('Annual financials returned no usable statements for ' + sym + '. History charts, revenue CAGR, EPS growth and margin trend will be unavailable.');
+    } else {
+      warn.push('Annual financials: ' + (res[3].reason ? res[3].reason.message : 'failed.') + ' History charts and trend factors will be unavailable.');
+    }
+
+    out.warnings = warn;
+    out.fatal = (!qOk && !mOk)
+      ? 'Could not load ' + sym + '. Both the quote and the fundamentals failed — see the messages below. If the ticker is right, you may simply be rate limited.'
+      : null;
+    return out;
+  });
+}
+
+/* Watchlist: one quote call per symbol, failures dropped silently. */
+function fetchWatchlist(){
+  State.watchState = 'loading';
+  return Promise.allSettled(CFG.WATCHLIST.map(function(s){
+    return fhGet('/quote', {symbol:s}).then(function(q){ return {sym:s, q:q}; });
+  })).then(function(res){
+    var rows = [];
+    res.forEach(function(r){
+      if(r.status!=='fulfilled') return;
+      var q = r.value.q; if(!q || num(q.c)===null || num(q.c)===0) return;
+      var hi = num(q.h), lo = num(q.l), c = num(q.c);
+      var pos = (hi!==null && lo!==null && hi>lo) ? (c-lo)/(hi-lo)*100 : null;
+      rows.push({sym:r.value.sym, price:c, chg:num(q.d), chgPct:num(q.dp),
+                 open:num(q.o), high:hi, low:lo, prev:num(q.pc), rangePos:pos});
+    });
+    rows.sort(function(a,b){ return (b.chgPct===null?-1e9:b.chgPct) - (a.chgPct===null?-1e9:a.chgPct); });
+    State.watch = rows;
+    State.watchState = rows.length ? 'ok' : 'fail';
+    render();
+  });
+}
+
+/* Verify before storing: a key that does not work should never be saved. */
+function verifyFinnhubKey(key){
+  return fetch(CFG.FH + '/quote?symbol=AAPL&token=' + encodeURIComponent(key),
+               {method:'GET', mode:'cors', cache:'no-store'})
+    .catch(function(){ throw new ApiErr(netMsg('finnhub.io'), 0); })
+    .then(function(r){
+      if(!r.ok) throw new ApiErr(statusMsg(r.status, '/quote'), r.status);
+      return r.json();
+    })
+    .then(function(j){
+      if(!j || num(j.c)===null || num(j.c)===0)
+        throw new ApiErr('Finnhub accepted the request but returned no price. A brand-new key can take a minute to activate — try again shortly.', 0);
+      return true;
+    });
+}
+function verifyAiKey(key){
+  return fetch(CFG.AI + '?key=' + encodeURIComponent(key), {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({contents:[{parts:[{text:'Reply with: ok'}]}],
+                          generationConfig:{maxOutputTokens:8, thinkingConfig:{thinkingBudget:0}}})
+  })
+  .catch(function(){ throw new ApiErr(netMsg('generativelanguage.googleapis.com'), 0); })
+  .then(function(r){
+    return r.json().catch(function(){ return {}; }).then(function(d){
+      if(!r.ok){
+        var msg = (d && d.error && d.error.message) ? d.error.message : ('HTTP ' + r.status);
+        if(r.status===429 && /limit:\s*0\b/.test(msg))
+          throw new ApiErr('That key works, but its Google project has no Gemini quota (free-tier "limit: 0"). Create one via "Create API key in new project" at aistudio.google.com/apikey.', 429);
+        throw new ApiErr('Key rejected: ' + msg, r.status);
+      }
+      return true;
+    });
+  });
+}
+
+/* Quote-only poll: one call, leaves fundamentals alone. Silent on failure —
+   the on-screen timestamp simply ages, which is the honest signal. */
+function refreshQuote(){
+  if(!State.metrics || State.loading) return Promise.resolve();
+  return fhGet('/quote', {symbol:State.ticker}).then(function(q){
+    if(!q || num(q.c)===null || num(q.c)===0) return;
+    State.quote = q;
+    State.metrics = computeMetrics();
+    State.lastPoll = Date.now();
+    /* Never yank the DOM out from under a focused field or a slider drag. */
+    var a = document.activeElement;
+    if(!(a && (a.tagName==='INPUT' || a.tagName==='TEXTAREA' || a.tagName==='SELECT'))) render();
+  }).catch(function(){});
+}
+
+/* --- Gemini thesis call ------------------------------------------------- */
+function apiThesis(payload){
+  return fetch(CFG.AI + '?key=' + encodeURIComponent(AI_KEY), {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      contents:[{parts:[{text:
+        /* Lens sets the priorities; the guardrails after it are fixed and
+           apply to every lens. */
+        (function(){
+          var l = CFG.LENSES.filter(function(x){ return x.id===State.lens; })[0] || CFG.LENSES[0];
+          return l.persona + ' ';
+        })() +
+        'You are reviewing computed metrics. Reason only from the data given; ' +
+        'if something is not in the data, say the data does not show it. Do not fill gaps with outside ' +
+        'knowledge and do not give buy or sell recommendations. Respond with raw JSON only — ' +
+        'no markdown fences, no preamble.\nData: ' + JSON.stringify(payload) + '\n' +
+        'Schema: {"thesis":string,"bullCase":[string],"bearCase":[string],' +
+        '"keyRisks":[{"risk":string,"severity":"high"|"medium"|"low"}],' +
+        '"moat":{"assessment":string,"strength":"wide"|"narrow"|"none"},"dataGaps":[string],' +
+        '"whatWouldChangeMyMind":[string],"convictionScore":number,"convictionReasoning":string}\n' +
+        '3-5 items per array. convictionScore 1-10 reflecting evidence strength, not enthusiasm.'
+      }]}],
+      /* 2.5 is a thinking model and reasoning tokens count against
+         maxOutputTokens — without this the budget is spent before any JSON
+         is emitted and the response comes back truncated. */
+      generationConfig:{maxOutputTokens: CFG.AI_MAX_TOKENS, responseMimeType:'application/json',
+                        thinkingConfig:{thinkingBudget:0}}
+    })
+  })
+  .catch(function(){ throw new ApiErr(netMsg('generativelanguage.googleapis.com'), 0); })
+  .then(function(r){
+    return r.json().catch(function(){ throw new ApiErr('The model endpoint returned a malformed response.',0); })
+      .then(function(data){
+        if(!r.ok){
+          var m = (data && data.error && data.error.message) ? data.error.message : ('the model endpoint returned ' + r.status);
+          if(r.status===400 || r.status===401 || r.status===403)
+            throw new ApiErr('Key rejected: ' + m, r.status);
+          if(r.status===429){
+            /* "limit: 0" is not throttling — the project has no free-tier
+               quota at all, and retrying will never succeed. Say so. */
+            if(/limit:\s*0\b/.test(m))
+              throw new ApiErr('The key works, but its Google project has no Gemini quota (the API reports free-tier "limit: 0"). ' +
+                'Retrying will not help. Either enable billing on that project, or create a fresh key at ' +
+                'aistudio.google.com/apikey using "Create API key in new project", then replace AI_KEY in section 1 of this file.', 429);
+            throw new ApiErr('Rate limited by the model endpoint. Wait a moment and retry. (' + m + ')', 429);
+          }
+          throw new ApiErr('Thesis request failed: ' + m, r.status);
+        }
+        var cand = data.candidates && data.candidates[0];
+        if(!cand) throw new ApiErr('The model returned no content. It may have been blocked by a safety filter.', 0);
+        if(cand.finishReason && cand.finishReason!=='STOP' && cand.finishReason!=='MAX_TOKENS')
+          throw new ApiErr('The model stopped early (' + cand.finishReason + ').', 0);
+        var parts = (cand.content && cand.content.parts) || [];
+        var text = parts.map(function(p){ return p.text || ''; }).join('');
+        if(!text.trim()) throw new ApiErr('The model returned an empty response.', 0);
+        try { return parseLooseJson(text); }
+        catch(e){ throw new ApiErr('Could not parse the model output as JSON' + (cand.finishReason==='MAX_TOKENS'?' — it was cut off at the token limit.':'.'), 0); }
+      });
+  });
+}
+
+/* ==========================================================================
+   5  METRICS
+   ========================================================================== */
+function computeMetrics(){
+  var q = State.quote || {}, p = State.profile || {}, k = State.metric || {}, a = State.annuals || [];
+  var m = {};
+
+  m.currency = p.currency || 'USD';
+  m.name     = p.name || '';
+  m.exchange = p.exchange || '';
+  m.industry = p.finnhubIndustry || '';
+  m.logo     = p.logo || '';
+  m.ipo      = p.ipo || '';
+  m.weburl   = p.weburl || '';
+
+  m.price     = num(q.c);
+  m.change    = num(q.d);
+  m.changePct = num(q.dp);
+  m.open      = num(q.o);
+  m.high      = num(q.h);
+  m.low       = num(q.l);
+  m.prevClose = num(q.pc);
+  m.quoteTime = num(q.t);
+
+  /* profile2 reports both of these in MILLIONS. */
+  var mc = num(p.marketCapitalization), sh = num(p.shareOutstanding);
+  m.marketCap = mc===null ? null : mc*1e6;
+  m.shares    = sh===null ? null : sh*1e6;
+  if(m.marketCap===null && m.shares!==null && m.price!==null) m.marketCap = m.shares*m.price;
+  if(m.shares===null && m.marketCap!==null && m.price) m.shares = m.marketCap/m.price;
+
+  m.pe   = num(k.peTTM);
+  m.psTTM= num(k.psTTM);
+  m.pb   = num(k.pbQuarterly);
+  m.beta = num(k.beta);
+  m.divYield = num(k.dividendYieldIndicatedAnnual);
+  m.roe  = num(k.roeTTM);
+  m.roi  = num(k.roiTTM);
+  m.currentRatio = num(k.currentRatioQuarterly);
+  m.de   = num(k['totalDebt/totalEquityQuarterly']);     // bracket notation: contains a slash
+  m.wk52High = num(k['52WeekHigh']);                      // bracket notation: starts with a digit
+  m.wk52Low  = num(k['52WeekLow']);
+
+  m.grossMargin = num(k.grossMarginTTM);
+  m.opMargin    = num(k.operatingMarginTTM);
+  m.netMargin   = num(k.netProfitMarginTTM);
+  m.revGrowth   = num(k.revenueGrowthTTMYoy);
+
+  /* There is no absolute revenue or FCF field on this endpoint. Derive both
+     from the per-share figures and the share count. */
+  m.revPerShare = num(k.revenuePerShareTTM);
+  m.fcfPerShare = num(k.freeCashFlowPerShareTTM);
+  m.revenueTTM  = (m.revPerShare!==null && m.shares!==null) ? m.revPerShare*m.shares : null;
+  m.fcfTTM      = (m.fcfPerShare!==null && m.shares!==null) ? m.fcfPerShare*m.shares : null;
+
+  /* ---- from annual history ---- */
+  m.years = a;
+  var withRev = a.filter(function(r){ return num(r.revenue)!==null && r.revenue>0; });
+  if(withRev.length>=2){
+    var f = withRev[0], l = withRev[withRev.length-1], n = withRev.length-1;
+    m.revenueCagr = (Math.pow(l.revenue/f.revenue, 1/n) - 1) * 100;
+    if(m.revGrowth===null){
+      var prev = withRev[withRev.length-2];
+      if(prev.revenue) m.revGrowth = (l.revenue-prev.revenue)/Math.abs(prev.revenue)*100;
+    }
+  } else { m.revenueCagr = null; }
+
+  var withEps = a.filter(function(r){ return num(r.eps)!==null; });
+  m.epsGrowth = null;
+  if(withEps.length>=2){
+    var e1 = withEps[withEps.length-1].eps, e0 = withEps[withEps.length-2].eps;
+    if(e0 !== 0) m.epsGrowth = (e1-e0)/Math.abs(e0)*100;
+  }
+
+  var withOm = a.filter(function(r){ return num(r.opMargin)!==null; });
+  m.marginTrend = withOm.length>=2
+    ? withOm[withOm.length-1].opMargin - withOm[0].opMargin
+    : null;
+
+  if(m.grossMargin===null && withRev.length){ var lg=withRev[withRev.length-1]; if(lg.grossMargin!==null) m.grossMargin=lg.grossMargin; }
+  if(m.opMargin===null && withOm.length){ m.opMargin = withOm[withOm.length-1].opMargin; }
+
+  var withFcf = a.filter(function(r){ return num(r.fcf)!==null; });
+  m.latestFcf = withFcf.length ? withFcf[withFcf.length-1].fcf : m.fcfTTM;
+  m.latestFcfSource = withFcf.length ? ('FY'+withFcf[withFcf.length-1].year+' filing') : (m.fcfTTM!==null?'TTM per-share x shares':'');
+
+  m.fcfYield = (m.latestFcf!==null && m.marketCap) ? m.latestFcf/m.marketCap*100 : null;
+  m.priceToSales = m.psTTM!==null ? m.psTTM
+                 : ((m.marketCap!==null && m.revenueTTM) ? m.marketCap/m.revenueTTM : null);
+
+  return m;
+}
+
+/* ==========================================================================
+   6  SIGNAL ENGINE
+   ========================================================================== */
+function runSignal(m, weights){
+  var factors = CFG.FACTORS.map(function(f){
+    /* distinct metric keys this factor depends on */
+    var inputs = [];
+    f.rules.forEach(function(r){ r.needs.forEach(function(n){ if(inputs.indexOf(n)<0) inputs.push(n); }); });
+    var present = inputs.filter(function(n){ return has(m,n); });
+
+    var earned = 0, possible = 0;
+    var trace = f.rules.map(function(r){
+      var ready = r.needs.every(function(n){ return has(m,n); });
+      if(!ready){
+        return {id:r.id, label:r.label, plain:r.plain, pts:r.pts, needs:r.needs, status:'nodata', earned:0, value:'no data'};
+      }
+      possible += r.pts;
+      var fired = false;
+      try { fired = !!r.test(m); } catch(e){ fired = false; }
+      if(fired) earned += r.pts;
+      var shown;
+      try { shown = r.show(m); } catch(e){ shown = '--'; }
+      return {id:r.id, label:r.label, plain:r.plain, pts:r.pts, needs:r.needs, status:fired?'hit':'miss', earned:fired?r.pts:0, value:shown};
+    });
+
+    /* Rules keyed on the same input are mutually exclusive tiers (P/E < 20 vs
+       P/E 20-35), so only one can ever fire. "possible" sums them all, which
+       means no company can reach 100 on such a factor. Compute the real
+       ceiling so the UI can show it rather than quietly implying 100. */
+    var byNeed = {}, maxAchievable = 0;
+    trace.forEach(function(r){
+      if(r.status==='nodata') return;
+      var k = r.needs.join('|');
+      byNeed[k] = Math.max(byNeed[k]||0, r.pts);
+    });
+    Object.keys(byNeed).forEach(function(k){ maxAchievable += byNeed[k]; });
+
+    var coverage = inputs.length ? present.length/inputs.length : 0;
+    /* Under half its inputs present -> the factor leaves the composite entirely.
+       Missing data must never be scored as zeros. */
+    var included  = coverage >= 0.5 && possible > 0;
+    var score     = possible>0 ? earned/possible*100 : null;
+
+    return {
+      id:f.id, label:f.label, color:f.color,
+      trace:trace, earned:earned, possible:possible,
+      maxAchievable:maxAchievable, capped: maxAchievable>0 && maxAchievable<possible,
+      score:score, included:included,
+      inputs:inputs.length, present:present.length,
+      missing: inputs.filter(function(n){ return !has(m,n); }),
+      coverage: coverage*100,
+      weight: num(weights[f.id])===null ? 0 : num(weights[f.id])
+    };
+  });
+
+  var inc = factors.filter(function(f){ return f.included; });
+  var wSum = inc.reduce(function(s,f){ return s+f.weight; },0);
+  var composite = null;
+  if(inc.length && wSum>0){
+    composite = inc.reduce(function(s,f){ return s + f.score*f.weight; },0) / wSum;
+  } else if(inc.length){
+    composite = inc.reduce(function(s,f){ return s+f.score; },0) / inc.length; // all weights zeroed
+  }
+
+  var totIn = factors.reduce(function(s,f){ return s+f.inputs; },0);
+  var totPr = factors.reduce(function(s,f){ return s+f.present; },0);
+
+  var band = null;
+  if(composite!==null){
+    for(var i=0;i<CFG.BANDS.length;i++){ if(composite>=CFG.BANDS[i].min){ band=CFG.BANDS[i]; break; } }
+  }
+
+  return {
+    factors:factors, composite:composite, band:band,
+    included:inc.length, dropped:factors.length-inc.length,
+    coverage: totIn ? totPr/totIn*100 : 0,
+    inputsPresent: totPr, inputsTotal: totIn
+  };
+}
+
+/* Deterministic written assessment, built only from the rules that actually
+   fired and the values they tested. No model, no network, no guessing — this
+   is the audit trace restated in prose, so the Thesis tab is never empty. */
+function localAssessment(m, sig, dcf){
+  var strengths=[], weaknesses=[], notAssessed=[], levers=[], gaps=[], superseded=[];
+
+  sig.factors.forEach(function(f){
+    /* A missed tier whose input already satisfied a higher-scoring tier is not
+       a weakness and must never become advice: "raise D/E into 1.0-2.0" when
+       D/E is 0.80x would be telling you to take on debt to score better. */
+    var beaten = {};
+    f.trace.forEach(function(r){
+      if(r.status!=='hit') return;
+      var k = r.needs.join('|');
+      beaten[k] = Math.max(beaten[k]||0, r.pts);
+    });
+
+    f.trace.forEach(function(r){
+      var line = r.label + ' — ' + r.value;
+      var plain = r.plain || r.label;
+      if(r.status==='hit'){
+        strengths.push({text:line, plain:plain, value:r.value, rule:r.label, pts:r.earned, factor:f.label});
+      } else if(r.status==='miss'){
+        var k = r.needs.join('|');
+        if(beaten[k] !== undefined && beaten[k] > r.pts){
+          superseded.push({text:line, plain:plain, value:r.value, rule:r.label, pts:r.pts, factor:f.label});
+          return;                       // neither a weakness nor a lever
+        }
+        weaknesses.push({text:line, plain:plain, value:r.value, rule:r.label, pts:r.pts, factor:f.label});
+        levers.push({text:'Meeting "' + r.label + '" (currently ' + r.value + ') would add ' +
+          r.pts + ' points to ' + f.label + '.',
+          plain: 'If it ' + plain.charAt(0).toLowerCase() + plain.slice(1) + ' — it is at ' + r.value + ' now.',
+          pts:r.pts, factor:f.label});
+      } else {
+        notAssessed.push({text:r.label, plain:plain, factor:f.label});
+      }
+    });
+    if(f.capped) gaps.push(f.label + ' can score at most ' + f.maxAchievable + ' of ' + f.possible +
+      ' points (' + (f.maxAchievable/f.possible*100).toFixed(0) + '%) because its tiered rules are mutually exclusive — ' +
+      'a flawless company still cannot reach 100 on this factor.');
+    if(!f.included) gaps.push(f.label + ' was dropped from the composite entirely — only ' +
+      f.present + ' of ' + f.inputs + ' inputs were available (' + f.missing.join(', ') + ').');
+    else if(f.missing.length) gaps.push(f.label + ' scored on partial data; missing: ' + f.missing.join(', ') + '.');
+  });
+
+  strengths.sort(function(a,b){ return b.pts-a.pts; });
+  weaknesses.sort(function(a,b){ return b.pts-a.pts; });
+  levers.sort(function(a,b){ return b.pts-a.pts; });
+
+  if(m.years.length && m.years.length < 3)
+    gaps.push('Only ' + m.years.length + ' year(s) of annual filings parsed, so CAGR and margin-trend figures rest on a very short history.');
+  if(!m.years.length)
+    gaps.push('No annual filings parsed at all — every history-derived figure is unavailable.');
+  if(m.latestFcfSource && m.latestFcfSource.indexOf('TTM')===0)
+    gaps.push('Free cash flow came from the TTM per-share metric rather than a filing, so it is less reliable than a reported figure.');
+
+  /* Headline: state the score and, plainly, how much of it is actually backed. */
+  var head;
+  if(sig.composite===null){
+    head = 'No composite score could be produced for ' + State.ticker +
+      ': not enough of the required inputs came back from the data provider.';
+  } else {
+    head = State.ticker + ' scores ' + sig.composite.toFixed(1) + ' of 100 against your configured rules, ' +
+      'which places it in the ' + sig.band.label + ' band. That score is built on ' +
+      sig.inputsPresent + ' of ' + sig.inputsTotal + ' available inputs (' + sig.coverage.toFixed(0) + '% coverage)' +
+      (sig.dropped ? ', with ' + sig.dropped + ' factor(s) excluded for insufficient data' : '') + '. ' +
+      strengths.length + ' of ' + (strengths.length+weaknesses.length) + ' scoring rules fired' +
+      (superseded.length ? ' (' + superseded.length + ' lower tier(s) already beaten and excluded)' : '') + '.';
+  }
+
+  /* Valuation paragraph, strictly from the DCF result. */
+  var valuation;
+  if(dcf.error){
+    valuation = 'No discounted cash flow value was produced. ' + dcf.error;
+  } else {
+    valuation = 'On your current assumptions (' + fx(dcf.assumptions.growth,1) + '% initial growth fading to ' +
+      fx(dcf.assumptions.terminal,1) + '% over ' + dcf.assumptions.fade + ' years, discounted at ' +
+      fx(dcf.assumptions.discount,2) + '%), the model returns ' + px(dcf.perShare, m.currency) +
+      ' per share against a market price of ' + px(dcf.price, m.currency) + ' — a margin of safety of ' +
+      pctS(dcf.mos,1) + '. ' +
+      (dcf.tvHot
+        ? 'Treat that cautiously: ' + fx(dcf.tvShare,1) + '% of the value sits in the terminal assumption, so you are pricing the assumption rather than the business.'
+        : fx(dcf.tvShare,1) + '% of the value sits in the terminal assumption.') +
+      ' There is no net-debt bridge, so read it as enterprise value per share.';
+  }
+
+  return {
+    headline: head, valuation: valuation,
+    strengths: strengths, weaknesses: weaknesses,
+    notAssessed: notAssessed, levers: levers, gaps: gaps, superseded: superseded
+  };
+}
+
+/* ==========================================================================
+   7  DCF
+   ========================================================================== */
+function runDcf(m, a){
+  var g0 = num(a.growth), fade = Math.round(num(a.fade)), gT = num(a.terminal), d = num(a.discount);
+
+  if(d===null||gT===null||g0===null||!fade)
+    return {error:'DCF assumptions are incomplete.'};
+  if(d <= gT)
+    return {error:'Discount rate (' + fx(d,1) + '%) must exceed terminal growth (' + fx(gT,1) + '%). At or below it the Gordon formula divides by zero or flips sign, and the result would be meaningless rather than merely wrong. Raise the discount rate or lower terminal growth.'};
+
+  var fcf0 = m.latestFcf;
+  if(fcf0===null)
+    return {error:'No free cash flow figure available for this company, so there is nothing to discount. Annual financials and the TTM per-share FCF metric both came back empty.'};
+  if(fcf0 <= 0)
+    return {error:'Latest free cash flow is ' + money(fcf0, m.currency) + '. A discounted cash flow model on negative cash flow produces a negative intrinsic value that means nothing. Use a different method for this company.'};
+
+  var shares = m.shares;
+  if(!shares)
+    return {error:'Share count is unavailable, so a per-share intrinsic value cannot be derived.'};
+
+  var rows = [], fcf = fcf0, pvSum = 0;
+  for(var i=1;i<=fade;i++){
+    /* growth fades linearly from g0 in year 1 to gT in the final year */
+    var g = fade>1 ? g0 + (gT-g0)*(i-1)/(fade-1) : gT;
+    fcf = fcf * (1 + g/100);
+    var disc = Math.pow(1 + d/100, i);
+    var pv = fcf/disc;
+    pvSum += pv;
+    rows.push({year:i, growth:g, fcf:fcf, pv:pv});
+  }
+  var tv    = fcf * (1 + gT/100) / ((d - gT)/100);
+  var pvTv  = tv / Math.pow(1 + d/100, fade);
+  var ev    = pvSum + pvTv;
+  var perShare = ev/shares;
+  var price = m.price;
+  var mos   = (price!==null && perShare>0) ? (perShare - price)/perShare*100 : null;
+  var upside= (price!==null && price>0) ? (perShare/price - 1)*100 : null;
+  var tvShare = ev>0 ? pvTv/ev*100 : null;
+
+  return {
+    rows:rows, pvExplicit:pvSum, tv:tv, pvTv:pvTv, ev:ev,
+    perShare:perShare, price:price, mos:mos, upside:upside,
+    tvShare:tvShare, tvHot: tvShare!==null && tvShare>75,
+    fcf0:fcf0, shares:shares, assumptions:{growth:g0, fade:fade, terminal:gT, discount:d}
+  };
+}
+
+function dcfValue(m, g0, fade, gT, d){
+  var r = runDcf(m, {growth:g0, fade:fade, terminal:gT, discount:d});
+  return r.error ? null : r.perShare;
+}
+
+/* 5x5: discount rate +/-2 (step 1) against terminal growth +/-1 (step 0.5). */
+function sensitivityGrid(m, a){
+  var ds=[], ts=[], i;
+  for(i=-2;i<=2;i++) ds.push(+(num(a.discount)+i).toFixed(2));
+  for(i=-2;i<=2;i++) ts.push(+(num(a.terminal)+i*0.5).toFixed(2));
+  var cells = ds.map(function(d){
+    return ts.map(function(t){
+      var v = dcfValue(m, a.growth, Math.round(a.fade), t, d);
+      var up = (v!==null && m.price) ? (v/m.price - 1)*100 : null;
+      return {
+        d:d, t:t, value:v, upside:up,
+        cur: Math.abs(d-num(a.discount))<1e-9 && Math.abs(t-num(a.terminal))<1e-9
+      };
+    });
+  });
+  return {ds:ds, ts:ts, cells:cells};
+}
+
+/* ==========================================================================
+   8  CHARTS  — hand-rolled SVG, colours read from CSS variables at draw time
+   ========================================================================== */
+function cssVar(name){
+  try {
+    var v = getComputedStyle(document.documentElement).getPropertyValue(name);
+    return (v||'').trim() || '#888';
+  } catch(e){ return '#888'; }
+}
+function niceTicks(min, max, count){
+  if(!isFinite(min)||!isFinite(max)) return [0,1];
+  if(min===max){ if(min===0){ min=0; max=1; } else { var p=Math.abs(min)*0.2; min-=p; max+=p; } }
+  var raw = (max-min)/Math.max(1,(count||5)-1);
+  if(!isFinite(raw)||raw<=0) raw = 1;
+  var exp = Math.floor(Math.log(Math.abs(raw))/Math.LN10);
+  var base = Math.pow(10, exp), f = raw/base;
+  var step = (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*base;
+  var lo = Math.floor(min/step)*step, hi = Math.ceil(max/step)*step;
+  var out=[], v=lo, guard=0;
+  while(v <= hi + step/1e6 && guard++<200){ out.push(Math.abs(v)<step/1e6?0:v); v+=step; }
+  return out.length>1?out:[lo,lo+step];
+}
+function emptyChart(msg, h){
+  return '<div class="mono" style="height:'+(h||180)+'px;display:flex;align-items:center;justify-content:center;'+
+         'color:var(--faint);font-size:10.5px;background:var(--well);border:1px solid var(--line)">'+esc(msg)+'</div>';
+}
+
+/* comboChart(data, {bars, lines, fmtY, height})
+     data  : [{label, <key>:number, ...}]
+     bars  : [{key,label,color}]   grouped
+     lines : [{key,label,color}]   overlaid, with dots and a last-value tag
+     fmtY  : function(v) -> string  (axis + legend formatting)                 */
+function comboChart(data, opt){
+  opt = opt||{};
+  var bars = opt.bars||[], lines = opt.lines||[], H = opt.height||250, W = 780;
+  var fmtY = opt.fmtY || function(v){ return money(v); };
+  if(!data || !data.length) return emptyChart(opt.empty||'No data available', H);
+
+  var series = bars.concat(lines);
+  var vals=[];
+  data.forEach(function(d){ series.forEach(function(s){ var v=num(d[s.key]); if(v!==null) vals.push(v); }); });
+  if(!vals.length) return emptyChart(opt.empty||'No data available', H);
+
+  var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+  if(lo>0) lo = 0; if(hi<0) hi = 0;
+  var ticks = niceTicks(lo, hi, 5);
+  var y0v = ticks[0], y1v = ticks[ticks.length-1];
+
+  var pad = {t: 26, r: 46, b: 26, l: 58};
+  var pw = W-pad.l-pad.r, ph = H-pad.t-pad.b;
+  var Y = function(v){ return pad.t + ph - (v-y0v)/((y1v-y0v)||1)*ph; };
+  var band = pw/data.length;
+  var groupW = band*0.62, barW = bars.length ? groupW/bars.length : 0;
+
+  var s = '<svg class="chart" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" role="img" aria-label="'+attr(opt.title||'chart')+'">';
+  s += '<rect x="'+pad.l+'" y="'+pad.t+'" width="'+pw+'" height="'+ph+'" fill="'+cssVar('--well')+'"/>';
+
+  // grid + y axis
+  ticks.forEach(function(t){
+    var y = Y(t);
+    s += '<line x1="'+pad.l+'" y1="'+y.toFixed(1)+'" x2="'+(W-pad.r)+'" y2="'+y.toFixed(1)+
+         '" stroke="'+cssVar(t===0?'--line-2':'--line')+'" stroke-width="1"'+(t===0?'':' stroke-dasharray="2 3"')+'/>';
+    s += '<text x="'+(pad.l-6)+'" y="'+(y+3.2).toFixed(1)+'" fill="'+cssVar('--faint')+
+         '" font-size="9" text-anchor="end">'+esc(fmtY(t))+'</text>';
+  });
+
+  // bars
+  bars.forEach(function(ser, si){
+    var col = cssVar(ser.color);
+    data.forEach(function(d,i){
+      var v = num(d[ser.key]); if(v===null) return;
+      var x = pad.l + i*band + (band-groupW)/2 + si*barW;
+      var yv = Y(v), yz = Y(0);
+      var top = Math.min(yv,yz), hgt = Math.max(1, Math.abs(yz-yv));
+      s += '<rect x="'+x.toFixed(1)+'" y="'+top.toFixed(1)+'" width="'+Math.max(1,barW-2).toFixed(1)+
+           '" height="'+hgt.toFixed(1)+'" fill="'+col+'" opacity="'+(v<0?'0.55':'0.85')+'">'+
+           '<title>'+esc(d.label+' '+ser.label+': '+fmtY(v))+'</title></rect>';
+    });
+  });
+
+  // lines + yellow last-value tag
+  lines.forEach(function(ser){
+    var col = cssVar(ser.color), pts=[], dots='', last=null;
+    data.forEach(function(d,i){
+      var v = num(d[ser.key]); if(v===null) return;
+      var cx = pad.l + i*band + band/2, cy = Y(v);
+      pts.push(cx.toFixed(1)+','+cy.toFixed(1));
+      last = {x:cx, y:cy, v:v};
+      dots += '<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="2.6" fill="'+cssVar('--well')+
+              '" stroke="'+col+'" stroke-width="1.5"><title>'+esc(d.label+' '+ser.label+': '+fmtY(v))+'</title></circle>';
+    });
+    if(pts.length>1) s += '<polyline points="'+pts.join(' ')+'" fill="none" stroke="'+col+'" stroke-width="1.6" stroke-linejoin="round"/>';
+    s += dots;
+    if(last && lines.length<=2){
+      var txt = fmtY(last.v), w = Math.max(26, txt.length*5.6+8);
+      s += '<rect x="'+(W-pad.r+3)+'" y="'+(last.y-7).toFixed(1)+'" width="'+w.toFixed(1)+'" height="14" fill="'+cssVar('--tag')+'"/>' +
+           '<text x="'+(W-pad.r+3+w/2).toFixed(1)+'" y="'+(last.y+3.4).toFixed(1)+'" fill="#1a1505" font-size="9" font-weight="700" text-anchor="middle">'+esc(txt)+'</text>';
+    }
+  });
+
+  // x labels
+  data.forEach(function(d,i){
+    var cx = pad.l + i*band + band/2;
+    s += '<text x="'+cx.toFixed(1)+'" y="'+(H-8)+'" fill="'+cssVar('--dim')+
+         '" font-size="9" text-anchor="middle">'+esc(d.label)+'</text>';
+  });
+
+  // legend
+  var lx = pad.l;
+  series.forEach(function(ser){
+    var col = cssVar(ser.color);
+    s += '<rect x="'+lx+'" y="8" width="8" height="8" fill="'+col+'" opacity="0.9"/>';
+    s += '<text x="'+(lx+11)+'" y="15.5" fill="'+cssVar('--dim')+'" font-size="9">'+esc(ser.label)+'</text>';
+    lx += 20 + ser.label.length*5.6;
+  });
+
+  return s + '</svg>';
+}
+
+/* radarChart(data): data = [{label, value(0-100)|null}] */
+function radarChart(data){
+  var S = 330, cx = S/2, cy = S/2 - 2, R = 100;
+  if(!data || data.length<3) return emptyChart('Not enough factors to plot', 220);
+  var n = data.length;
+  var ang = function(i){ return -Math.PI/2 + i*2*Math.PI/n; };
+  var P = function(i, r){ return [cx + Math.cos(ang(i))*r, cy + Math.sin(ang(i))*r]; };
+
+  var s = '<svg class="chart" viewBox="0 0 '+S+' '+S+'" preserveAspectRatio="xMidYMid meet" role="img" aria-label="factor radar">';
+
+  [25,50,75,100].forEach(function(lvl){
+    var r = lvl/100*R, pts=[];
+    for(var i=0;i<n;i++){ var p=P(i,r); pts.push(p[0].toFixed(1)+','+p[1].toFixed(1)); }
+    s += '<polygon points="'+pts.join(' ')+'" fill="none" stroke="'+cssVar(lvl===100?'--line-2':'--line')+'" stroke-width="1"/>';
+  });
+  for(var i=0;i<n;i++){
+    var p = P(i,R);
+    s += '<line x1="'+cx+'" y1="'+cy+'" x2="'+p[0].toFixed(1)+'" y2="'+p[1].toFixed(1)+'" stroke="'+cssVar('--line')+'" stroke-width="1"/>';
+  }
+  s += '<text x="'+(cx+3)+'" y="'+(cy-R+10)+'" fill="'+cssVar('--faint')+'" font-size="8.5">100</text>';
+
+  var pts=[], dots='';
+  for(var j=0;j<n;j++){
+    var v = num(data[j].value);
+    var r = (v===null?0:clamp(v,0,100))/100*R;
+    var p = P(j,r);
+    pts.push(p[0].toFixed(1)+','+p[1].toFixed(1));
+    if(v!==null) dots += '<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="3" fill="'+cssVar('--accent')+'"/>';
+  }
+  var anyNull = data.some(function(d){ return num(d.value)===null; });
+  s += '<polygon points="'+pts.join(' ')+'" fill="'+cssVar('--accent')+'" fill-opacity="0.18" stroke="'+cssVar('--accent')+
+       '" stroke-width="1.7"'+(anyNull?' stroke-dasharray="4 3"':'')+'/>' + dots;
+
+  for(var q=0;q<n;q++){
+    var p2 = P(q, R+22), c = Math.cos(ang(q));
+    var anchor = Math.abs(c)<0.3 ? 'middle' : (c>0?'start':'end');
+    var v2 = num(data[q].value);
+    s += '<text x="'+p2[0].toFixed(1)+'" y="'+p2[1].toFixed(1)+'" fill="'+cssVar('--dim')+
+         '" font-size="9.5" text-anchor="'+anchor+'">'+esc(data[q].label)+'</text>';
+    s += '<text x="'+p2[0].toFixed(1)+'" y="'+(p2[1]+11).toFixed(1)+'" fill="'+cssVar(v2===null?'--faint':'--text')+
+         '" font-size="10.5" text-anchor="'+anchor+'">'+esc(v2===null?'excluded':v2.toFixed(0))+'</text>';
+  }
+  return s + '</svg>';
+}
+
+/* ==========================================================================
+   9  COMPONENTS
+   ========================================================================== */
+function panel(title, body, right){
+  return '<section class="panel">' +
+    (title ? '<div class="panel-h"><h2>'+esc(title)+'</h2>'+(right||'')+'</div>' : '') +
+    '<div class="panel-b">'+body+'</div></section>';
+}
+function panelT(title, body, right){
+  return '<section class="panel">' +
+    (title ? '<div class="panel-h"><h2>'+esc(title)+'</h2>'+(right||'')+'</div>' : '') +
+    '<div class="panel-b tight">'+body+'</div></section>';
+}
+function card(label, value, sub, klass){
+  return '<div class="card"><div class="lbl">'+esc(label)+'</div>' +
+    '<div class="v '+(klass||'')+'">'+esc(value)+'</div>' +
+    (sub ? '<div class="s">'+esc(sub)+'</div>' : '') + '</div>';
+}
+function tag(text, klass){ return '<span class="tag '+(klass||'')+'">'+esc(text)+'</span>'; }
+function note(title, body, klass){
+  return '<div class="note '+(klass||'')+'"><b>'+esc(title)+'</b>'+body+'</div>';
+}
+function btn(act, label, klass, extra){
+  return '<button type="button" data-act="'+attr(act)+'" class="'+(klass||'')+'" '+(extra||'')+'>'+esc(label)+'</button>';
+}
+function slider(group, key, label, min, max, step, value, fmt){
+  var id = 'sld-'+group+'-'+key;
+  return '<div class="sld">' +
+    '<div class="sld-h"><label class="lbl" for="'+id+'">'+esc(label)+'</label>' +
+    '<span class="v" id="out-'+group+'-'+key+'">'+esc(fmt(value))+'</span></div>' +
+    '<input type="range" id="'+id+'" data-slider="'+attr(group+'.'+key)+'" min="'+min+'" max="'+max+
+    '" step="'+step+'" value="'+attr(value)+'" aria-label="'+attr(label)+'"></div>';
+}
+
+/* Finviz-style split bar: green share on the left, red remainder on the
+   right, labelled at both ends with a centred caption. */
+function breadthBar(leftLabel, leftPct, centre, rightLabel, opts){
+  opts = opts||{};
+  var p = num(leftPct);
+  if(p===null){
+    return '<div class="breadth"><div class="breadth-h">' +
+      '<span class="faint">'+esc(leftLabel)+'</span><span class="c">'+esc(centre||'')+'</span>' +
+      '<span class="faint">no data</span></div>' +
+      '<div class="breadth-b"><i class="o" style="width:100%"></i></div></div>';
+  }
+  p = clamp(p, 0, 100);
+  return '<div class="breadth"><div class="breadth-h">' +
+    '<span class="pos">'+esc(leftLabel)+' '+esc(fx(p,1))+'%</span>' +
+    '<span class="c">'+esc(centre||'')+'</span>' +
+    '<span class="'+(opts.mute?'faint':'neg')+'">'+esc(rightLabel)+' '+esc(fx(100-p,1))+'%</span></div>' +
+    '<div class="breadth-b"><i class="g" style="width:'+p.toFixed(2)+'%"></i>' +
+    '<i class="'+(opts.mute?'o':'r')+'" style="width:'+(100-p).toFixed(2)+'%"></i></div></div>';
+}
+
+/* Heatmap tiles, coloured by percent change. Clicking one loads that ticker. */
+function heatTiles(rows){
+  if(!rows.length) return '<div class="faint mono" style="font-size:10.5px;padding:8px">Watchlist unavailable.</div>';
+  return '<div class="heat">' + rows.map(function(r){
+    return '<button type="button" data-act="chip" data-sym="'+attr(r.sym)+'" ' +
+      'style="background:'+heatColor(r.chgPct)+'" title="'+attr(r.sym+'  '+px(r.price)+'  '+pctS(r.chgPct,2))+'">' +
+      '<span class="t">'+esc(r.sym)+'</span>' +
+      '<span class="p">'+esc(pctS(r.chgPct,2))+'</span></button>';
+  }).join('') + '</div>';
+}
+
+function bullets(items){
+  var a = asArr(items).filter(function(x){ return x!==null && x!==undefined && String(x).trim(); });
+  if(!a.length) return '<div class="faint mono" style="font-size:10.5px">none returned</div>';
+  return '<ul class="bullets prose">' + a.map(function(x){
+    return '<li>'+esc(typeof x==='string'?x:JSON.stringify(x))+'</li>';
+  }).join('') + '</ul>';
+}
+function warnBlock(list){
+  if(!list || !list.length) return '';
+  return note('Partial data — ' + list.length + ' request' + (list.length>1?'s':'') + ' degraded',
+    '<ul class="bullets" style="font-size:11.5px;color:#c2cad4">' +
+    list.map(function(w){ return '<li>'+esc(w)+'</li>'; }).join('') + '</ul>', 'warn');
+}
+
+/* ==========================================================================
+   10  VIEWS
+   ========================================================================== */
+
+/* First run only. Keys are never written into the file, so a fresh clone of
+   the repo always lands here — once. */
+function viewSetup(){
+  var v = State.verify;
+  return '<div class="setup">' +
+    '<div class="logo" style="justify-content:center;margin-bottom:20px">' +
+      '<span class="mk">S</span><b>stockterm</b></div>' +
+    '<div class="setup-card">' +
+      '<h2 style="font-size:20px;letter-spacing:-.02em;margin-bottom:6px">One-time setup</h2>' +
+      '<div class="prose" style="color:var(--dim)">This app runs entirely in your browser. ' +
+      'It needs one free API key, stored on this device only — never in the file.</div>' +
+      '<ol class="steps">' +
+        '<li><div class="prose">Open <a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer">finnhub.io/register</a> and make a free account.</div></li>' +
+        '<li><div class="prose">Copy the API key from your dashboard.</div></li>' +
+        '<li><div class="prose">Paste it below. It is checked with a live request before being saved.</div></li>' +
+      '</ol>' +
+      '<input id="in-finnhub" type="password" data-draft="finnhub" data-enter="saveFinnhub" ' +
+        'autocomplete="off" spellcheck="false" placeholder="Paste your Finnhub key" value="'+attr(Draft.finnhub)+'">' +
+      '<div class="row" style="margin-top:12px">' +
+        btn('saveFinnhub', v.status==='checking'?'Checking…':'Verify and start', 'primary', v.status==='checking'?'disabled':'') +
+      '</div>' +
+      (v.status==='error' ? note('Not saved','<div class="prose">'+esc(v.msg)+'</div>','neg') : '') +
+      (Store.ok ? '' : note('Storage blocked',
+        '<div class="prose">This browser blocks localStorage for local files, so the key will be kept in memory only and lost when the tab closes.</div>','warn')) +
+      '<div class="faint" style="font-size:11.5px;margin-top:16px;line-height:1.6">' +
+      'Stored under <span class="mono">'+esc(CFG.LS_KEYS)+'</span> in this browser. ' +
+      'Clear it any time from Settings.</div>' +
+    '</div>' +
+    '<div class="faint" style="font-size:11px;text-align:center;margin-top:16px">' +
+    'A modelling tool, not investment advice. Nobody involved is a licensed advisor.</div></div>';
+}
+
+function viewHeader(){
+  return '<header class="hdr"><div class="hdr-in">' +
+    '<div class="logo"><span class="mk">S</span><b>stockterm</b></div>' +
+    '<div class="search">' +
+      '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6d747f" stroke-width="2.4" aria-hidden="true">' +
+      '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>' +
+      '<input id="in-ticker" type="text" data-draft="ticker" data-enter="load" autocomplete="off" ' +
+      'spellcheck="false" aria-label="Search ticker" placeholder="Search ticker, company or profile" value="'+attr(Draft.ticker)+'">' +
+    '</div>' +
+    '<button type="button" class="go" data-act="load"'+(State.loading?' disabled':'')+'>' +
+      (State.loading?'Loading…':'Load') + '</button>' +
+    '<div class="sp"></div>' +
+    (State.toast ? '<span class="mono" style="font-size:10px;color:#1f8f3d;font-weight:700">'+esc(State.toast)+'</span>' : '') +
+    '<button type="button" class="go alt" data-act="export">Export</button>' +
+    '</div></header>' +
+
+    '<nav class="nav"><div class="nav-in">' +
+      CFG.TABS.map(function(t){
+        return '<button type="button" class="nav-i'+(t.id===State.tab?' on':'')+'" data-act="tab" data-tab="'+attr(t.id)+'" ' +
+          'aria-current="'+(t.id===State.tab?'page':'false')+'">'+esc(t.label)+'</button>';
+      }).join('') +
+      '<div class="sp"></div>' +
+      (State.loading?'<span class="clock"><span class="spin"></span> fetching</span>':'') +
+      '<button type="button" class="nav-i" data-act="toggleLive" ' +
+        'title="'+attr(State.live ? 'Polling the quote every '+(CFG.LIVE_MS/1000)+'s. Click to pause.' : 'Auto-refresh paused. Click to resume.')+'">' +
+        (State.live ? '<span style="color:#2fd35f">●</span> LIVE ' + (CFG.LIVE_MS/1000) + 's'
+                    : '<span style="color:#8b93a1">❚❚</span> PAUSED') + '</button>' +
+      '<span class="clock">'+esc(clockStr())+'</span>' +
+    '</div></nav>';
+}
+
+function viewQuoteStrip(m){
+  if(!m || m.price===null) return '';
+  var c = cls(m.change);
+  var dayBar = '';
+  if(m.high!==null && m.low!==null && m.high>m.low){
+    var p = clamp((m.price-m.low)/(m.high-m.low),0,1)*100;
+    dayBar = '<div style="min-width:150px"><div class="lbl">Day range</div>' +
+      '<div class="rangebar"><i style="left:'+p.toFixed(1)+'%"></i></div>' +
+      '<div class="mono faint" style="font-size:9px;display:flex;justify-content:space-between;margin-top:2px">' +
+      '<span>'+esc(px(m.low))+'</span><span>'+esc(px(m.high))+'</span></div></div>';
+  }
+  var wkBar = '';
+  if(m.wk52High!==null && m.wk52Low!==null && m.wk52High>m.wk52Low){
+    var p2 = clamp((m.price-m.wk52Low)/(m.wk52High-m.wk52Low),0,1)*100;
+    wkBar = '<div style="min-width:150px"><div class="lbl">52-week range</div>' +
+      '<div class="rangebar"><i style="left:'+p2.toFixed(1)+'%"></i></div>' +
+      '<div class="mono faint" style="font-size:9px;display:flex;justify-content:space-between;margin-top:2px">' +
+      '<span>'+esc(px(m.wk52Low))+'</span><span>'+esc(px(m.wk52High))+'</span></div></div>';
+  }
+  return '<section class="panel"><div class="quote">' +
+    '<div><div class="q-sym">'+esc(State.ticker)+'</div>' +
+      '<div class="dim" style="font-size:11.5px;max-width:230px">'+esc(m.name||'—')+'</div>' +
+      '<div class="faint" style="font-size:9.5px;margin-top:1px">'+esc([m.exchange,m.industry].filter(Boolean).join(' · ')||'—')+'</div></div>' +
+    '<div><div class="q-px '+c+'">'+esc(px(m.price,m.currency))+'</div>' +
+      '<div class="q-ch '+c+'">'+esc(sgn(m.change,2))+' &nbsp;'+esc(pctS(m.changePct,2))+'</div></div>' +
+    '<div class="q-meta">' +
+      '<div><div class="lbl">Open</div><div class="v">'+esc(px(m.open))+'</div></div>' +
+      '<div><div class="lbl">High</div><div class="v">'+esc(px(m.high))+'</div></div>' +
+      '<div><div class="lbl">Low</div><div class="v">'+esc(px(m.low))+'</div></div>' +
+      '<div><div class="lbl">Prev</div><div class="v">'+esc(px(m.prevClose))+'</div></div>' +
+      '<div><div class="lbl">Mkt cap</div><div class="v">'+esc(money(m.marketCap,m.currency))+'</div></div>' +
+      '<div><div class="lbl">P/E</div><div class="v">'+esc(m.pe===null?'--':fx(m.pe,1))+'</div></div>' +
+    '</div>' + dayBar + wkBar +
+    '<div class="sp"></div>' +
+    '<div style="text-align:right">' +
+      '<div class="lbl">Quote timestamp</div>' +
+      '<div class="mono" style="font-size:10.5px">'+esc(tsFmt(m.quoteTime))+'</div>' +
+      '<div class="mono ' + (isStale(m.quoteTime, 300) ? 'warn' : 'pos') + '" style="font-size:10.5px">' +
+        esc(agoStr(m.quoteTime)) +
+        (isStale(m.quoteTime, 300) ? ' — market likely closed' : ' — live') + '</div>' +
+    '</div></div></section>';
+}
+
+/* Factor scores as a Finviz-style breadth strip. */
+function viewBreadthStrip(m){
+  var sig = runSignal(m, State.weights);
+  var bars = sig.factors.map(function(f){
+    return '<div>' + breadthBar(
+      f.label, f.included ? f.score : null,
+      f.included ? ('score ' + fx(f.score,0)) : (f.present + '/' + f.inputs + ' inputs'),
+      'Shortfall', {mute: !f.included}
+    ) + '</div>';
+  }).join('');
+  return '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:6px;margin:7px 0">' +
+    bars + '</div>';
+}
+
+function viewMovers(){
+  if(State.watchState==='loading')
+    return '<div class="faint mono" style="font-size:10.5px;padding:10px"><span class="spin"></span> loading watchlist…</div>';
+  if(!State.watch.length)
+    return '<div class="faint mono" style="font-size:10.5px;padding:10px">Watchlist unavailable — the quote calls failed or were rate limited.</div>';
+  return '<div class="scroll"><table class="tbl"><thead><tr>' +
+    '<th>Ticker</th><th class="n">Last</th><th class="n">Change</th><th class="n">Open</th>' +
+    '<th class="n">Range</th><th>Signal</th></tr></thead><tbody>' +
+    State.watch.map(function(r){
+      var sigTxt = r.chgPct===null ? '—'
+        : r.chgPct >= 2 ? 'Top Gainer'
+        : r.chgPct <= -2 ? 'Top Loser'
+        : (r.rangePos!==null && r.rangePos>=85) ? 'Near day high'
+        : (r.rangePos!==null && r.rangePos<=15) ? 'Near day low'
+        : r.chgPct>0 ? 'Advancing' : 'Declining';
+      var sc = r.chgPct===null ? 'faint' : (r.chgPct>=2?'pos':(r.chgPct<=-2?'neg':'dim'));
+      return '<tr><td><a class="tk" href="#" data-act="chip" data-sym="'+attr(r.sym)+'">'+esc(r.sym)+'</a></td>' +
+        '<td class="n">'+esc(px(r.price))+'</td>' +
+        '<td class="n '+cls(r.chgPct)+'">'+esc(pctS(r.chgPct,2))+'</td>' +
+        '<td class="n dim">'+esc(px(r.open))+'</td>' +
+        '<td class="n dim">'+esc(r.rangePos===null?'--':fx(r.rangePos,0)+'%')+'</td>' +
+        '<td class="'+sc+'">'+esc(sigTxt)+'</td></tr>';
+    }).join('') + '</tbody></table></div>';
+}
+
+/* ---- OVERVIEW ---- */
+function viewOverview(m){
+  var cards = [
+    ['Price',          px(m.price,m.currency),        m.currency,                      ''],
+    ['Change',         pctS(m.changePct,2),           'today',                         cls(m.changePct)],
+    ['Market cap',     money(m.marketCap,m.currency), 'profile2 x 1e6',                ''],
+    ['Shares out',     money(m.shares),               'profile2 x 1e6',                ''],
+    ['P/E TTM',        m.pe===null?'--':fx(m.pe,1)+'x',            'peTTM',            ''],
+    ['P/S',            m.priceToSales===null?'--':fx(m.priceToSales,2)+'x', m.psTTM!==null?'psTTM':'mcap / revenue', ''],
+    ['P/B',            m.pb===null?'--':fx(m.pb,2)+'x',            'pbQuarterly',      ''],
+    ['Beta',           fx(m.beta,2),                  'vs market',                     ''],
+    ['Dividend yield', pct(m.divYield,2),             'indicated annual',              ''],
+    ['Rev growth YoY', pctS(m.revGrowth,1),           'TTM',                  cls(m.revGrowth)],
+    ['Rev CAGR',       pctS(m.revenueCagr,1),         m.years.length?(m.years.length+'y annual'):'no history', cls(m.revenueCagr)],
+    ['EPS growth',     pctS(m.epsGrowth,1),           'last FY vs prior',     cls(m.epsGrowth)],
+    ['Gross margin',   pct(m.grossMargin,1),          'TTM',                           ''],
+    ['Operating margin',pct(m.opMargin,1),            'TTM',                           ''],
+    ['Net margin',     pct(m.netMargin,1),            'TTM',                           ''],
+    ['Margin trend',   m.marginTrend===null?'--':sgn(m.marginTrend,1)+'pp', 'op margin, first to last FY', cls(m.marginTrend)],
+    ['ROE',            pct(m.roe,1),                  'TTM',                           ''],
+    ['ROI',            pct(m.roi,1),                  'TTM',                           ''],
+    ['Current ratio',  m.currentRatio===null?'--':fx(m.currentRatio,2)+'x','quarterly', ''],
+    ['Debt / equity',  m.de===null?'--':fx(m.de,2)+'x','quarterly',                     ''],
+    ['Revenue TTM',    money(m.revenueTTM,m.currency),'rev/share x shares',            ''],
+    ['Free cash flow', money(m.latestFcf,m.currency), m.latestFcfSource||'--',         cls(m.latestFcf)],
+    ['FCF yield',      pct(m.fcfYield,2),             'FCF / market cap',     cls(m.fcfYield)],
+    ['52w high / low', (m.wk52High===null?'--':fx(m.wk52High,2))+' / '+(m.wk52Low===null?'--':fx(m.wk52Low,2)), 'metric endpoint','']
+  ];
+  /* Eight that matter by default; the rest behind a toggle. Twenty-four cards
+     at once is a wall, not information. */
+  var shown = State.showAll ? cards : cards.slice(0, 8);
+  var cardsHtml = shown.map(function(c){ return card(c[0],c[1],c[2],c[3]); }).join('');
+  var moreBtn = '<div class="row" style="margin-top:12px">' +
+    btn('toggleAll', State.showAll ? 'Show fewer' : 'Show all ' + cards.length + ' metrics', 'ghost') + '</div>';
+
+  /* Finnhub can return 15+ years; past ~12 the bars are too thin to read.
+     Charts show the most recent slice and say so — the table below keeps all. */
+  var CHART_YEARS = 12;
+  var histAll = m.years.map(function(y){
+    return {label:'FY'+y.year, revenue:y.revenue, netIncome:y.netIncome, fcf:y.fcf,
+            grossMargin:y.grossMargin, opMargin:y.opMargin, netMargin:y.netMargin};
+  });
+  var hist = histAll.slice(-CHART_YEARS);
+  var histLbl = '<span class="faint mono" style="font-size:9.5px">' +
+    (histAll.length > hist.length ? 'last ' + hist.length + ' of ' + histAll.length + ' FY' : hist.length + ' FY') +
+    '</span>';
+
+  var histTable = hist.length ? '<div class="scroll"><table class="tbl"><thead><tr>' +
+      '<th>FY</th><th class="n">Revenue</th><th class="n">Gross</th><th class="n">Operating</th>' +
+      '<th class="n">Net income</th><th class="n">EPS</th><th class="n">CFO</th><th class="n">Capex</th><th class="n">FCF</th></tr></thead><tbody>' +
+      m.years.slice().reverse().map(function(y){
+        return '<tr><td>FY'+esc(y.year)+'</td>' +
+          '<td class="n">'+esc(money(y.revenue))+'</td>' +
+          '<td class="n">'+esc(money(y.grossProfit))+'</td>' +
+          '<td class="n">'+esc(money(y.opIncome))+'</td>' +
+          '<td class="n '+cls(y.netIncome)+'">'+esc(money(y.netIncome))+'</td>' +
+          '<td class="n">'+esc(fx(y.eps,2))+'</td>' +
+          '<td class="n">'+esc(money(y.cfo))+'</td>' +
+          '<td class="n">'+esc(money(y.capex))+'</td>' +
+          '<td class="n '+cls(y.fcf)+'">'+esc(money(y.fcf))+'</td></tr>';
+      }).join('') + '</tbody></table></div>' : '';
+
+  var sigNow = runSignal(m, State.weights);
+
+  return viewQuoteStrip(m) +
+    '<div class="cta">' +
+      '<div><div class="t">Written analysis for ' + esc(State.ticker) + ' is ready' +
+        (sigNow.composite!==null ? ' — scores ' + esc(sigNow.composite.toFixed(1)) + '/100, ' + esc(sigNow.band.label) : '') + '</div>' +
+      '<div class="s">What is working, what is not, what would move the score, and where the data is thin.</div></div>' +
+      '<div class="sp"></div>' +
+      btn('goAnalysis','Open analysis →') +
+      btn('tabSignal','See the rule trace','ghost') +
+    '</div>' +
+    viewBreadthStrip(m) +
+    warnBlock(State.warnings) +
+    panel('Key metrics', '<div class="cards">'+cardsHtml+'</div>' + moreBtn,
+      '<span class="faint mono" style="font-size:11px">'+esc(State.ticker)+' · '+esc(m.currency)+'</span>') +
+    '<div class="grid g2">' +
+      panel('Revenue, net income & free cash flow',
+        comboChart(hist, {
+          bars:  [{key:'revenue', label:'Revenue', color:'--accent'},
+                  {key:'netIncome', label:'Net income', color:'--violet'}],
+          lines: [{key:'fcf', label:'Free cash flow', color:'--pos'}],
+          fmtY: function(v){ return money(v); }, height:252,
+          empty:'Annual financials unavailable', title:'revenue, net income and free cash flow by fiscal year'
+        }), histLbl) +
+      panel('Margin trend',
+        comboChart(hist, {
+          bars: [],
+          lines:[{key:'grossMargin', label:'Gross', color:'--accent'},
+                 {key:'opMargin',    label:'Operating', color:'--warn'},
+                 {key:'netMargin',   label:'Net', color:'--pos'}],
+          fmtY: function(v){ return v.toFixed(0)+'%'; }, height:252,
+          empty:'Annual financials unavailable', title:'margins by fiscal year'
+        }), histLbl) +
+    '</div>' +
+    '<div class="grid g23">' +
+      panelT('Watchlist heat',
+        '<div style="padding:5px">'+heatTiles(State.watch)+'</div>',
+        btn('refreshWatch', State.watchState==='loading'?'…':'Refresh','ghost')) +
+      panelT('Movers', viewMovers(),
+        '<span class="faint mono" style="font-size:9.5px">'+State.watch.length+' symbols · click to analyze</span>') +
+    '</div>' +
+    (histTable && State.showAll ? panelT('Annual filings as reported', histTable,
+      '<span class="faint mono" style="font-size:11px">'+m.years.length+' years · concept-matched</span>') : '');
+}
+
+/* ---- SIGNAL ---- */
+function signalBody(){
+  var m = State.metrics; if(!m) return '';
+  var sig = runSignal(m, State.weights);
+
+  var head = '<div class="row" style="align-items:flex-end;gap:24px;margin-bottom:4px">' +
+    '<div><div class="lbl">Composite</div>' +
+      '<div class="num '+(sig.band?sig.band.cls:'faint')+'" style="font-size:40px;line-height:1;letter-spacing:-.035em">' +
+      esc(sig.composite===null?'--':sig.composite.toFixed(1))+'</div></div>' +
+    '<div><div class="lbl">Band</div><div style="margin-top:4px">' +
+      (sig.band ? tag(sig.band.label, sig.band.cls) : tag('no score','')) + '</div></div>' +
+    '<div><div class="lbl">Data coverage</div><div class="num" style="font-size:18px;margin-top:2px">' +
+      esc(sig.coverage.toFixed(0))+'%<span class="faint" style="font-size:10.5px"> &nbsp;'+sig.inputsPresent+'/'+sig.inputsTotal+' inputs</span></div></div>' +
+    '<div><div class="lbl">Factors in composite</div><div class="num" style="font-size:18px;margin-top:2px">' +
+      sig.included+' / '+sig.factors.length +
+      (sig.dropped?'<span class="warn" style="font-size:10.5px"> &nbsp;'+sig.dropped+' dropped</span>':'') + '</div></div>' +
+    '</div>' +
+    '<div class="faint" style="font-size:10.5px;line-height:1.5">' +
+    'Band thresholds are your configured rules scoring themselves — not a recommendation. ' +
+    'A factor with under half its inputs present is dropped from the composite and the remaining weights are renormalised, ' +
+    'so absent data is never scored as a zero.</div>';
+
+  var radar = radarChart(sig.factors.map(function(f){
+    return {label:f.label.split(' ')[0].toUpperCase(), value: f.included ? f.score : null};
+  }));
+
+  var weightNote = sig.dropped ? note('Weights renormalised',
+    '<div class="prose">' + esc(sig.factors.filter(function(f){return !f.included})
+      .map(function(f){ return f.label + ' (' + f.present + '/' + f.inputs + ' inputs)'; }).join(', ')) +
+    ' left the composite. The remaining factor weights were rescaled to sum to 100%.</div>', 'warn') : '';
+
+  var traces = sig.factors.map(function(f){
+    var effW = f.included && sig.included ? (function(){
+      var t = sig.factors.filter(function(x){return x.included}).reduce(function(s,x){return s+x.weight},0);
+      return t>0 ? f.weight/t*100 : 0;
+    })() : 0;
+
+    var rows = f.trace.map(function(r){
+      var st = r.status==='hit'   ? '<span class="tag pos">hit</span>'
+             : r.status==='miss'  ? '<span class="tag">miss</span>'
+             : '<span class="tag warn">no data</span>';
+      return '<tr'+(r.status==='nodata'?' class="off"':'')+'>' +
+        '<td>'+esc(r.label)+'</td>' +
+        '<td>'+st+'</td>' +
+        '<td class="n">'+esc(r.value)+'</td>' +
+        '<td class="n">'+(r.status==='nodata' ? '<span class="faint">excluded</span>'
+            : '<span class="'+(r.earned?'pos':'faint')+'">'+r.earned+'</span><span class="faint"> / '+r.pts+'</span>')+'</td></tr>';
+    }).join('');
+
+    return '<section class="panel"><div class="panel-h">' +
+      '<h2>'+esc(f.label)+'</h2>' +
+      '<div class="row" style="gap:5px">' +
+        (f.included ? tag('weight '+fx(effW,0)+'%','acc') : tag('excluded','warn')) +
+        tag(f.present+'/'+f.inputs+' inputs', f.coverage>=50?'':'warn') +
+        '<span class="num" style="font-size:16px">'+esc(f.score===null?'--':f.score.toFixed(1))+'</span>' +
+      '</div></div><div class="panel-b tight">' +
+      '<table class="tbl"><thead><tr><th>Rule</th><th>Result</th><th class="n">Value tested</th><th class="n">Points</th></tr></thead>' +
+      '<tbody>'+rows+'</tbody></table>' +
+      '<div class="row" style="justify-content:space-between;padding:6px 8px;border-top:1px solid var(--line-2)">' +
+        '<span class="lbl">Earned / possible</span>' +
+        '<span class="mono" style="font-size:11px">'+f.earned+' / '+f.possible +
+        ' &nbsp;=&nbsp; <span class="acc">'+esc(f.score===null?'--':f.score.toFixed(1))+'</span></span></div>' +
+      (f.capped ? '<div class="mono warn" style="font-size:9.5px;padding:0 8px 6px">' +
+        'ceiling ' + fx(f.maxAchievable/f.possible*100,0) + ' — tiers on the same input are mutually exclusive, ' +
+        'so ' + f.maxAchievable + '/' + f.possible + ' pts is the most any company can earn here</div>' : '') +
+      (f.missing.length ? '<div class="mono faint" style="font-size:9.5px;padding:0 8px 6px">missing: '+esc(f.missing.join(', '))+'</div>' : '') +
+      '</div></section>';
+  }).join('');
+
+  return '<div class="grid g32">' +
+      panel('Composite', head) +
+      panel('Factor radar', radar) +
+    '</div>' + weightNote +
+    '<div class="lbl" style="margin:12px 0 2px">Audit trace — every rule, whether it fired, the value it tested</div>' +
+    '<div class="grid g2">'+traces+'</div>';
+}
+function viewSignal(m){
+  var wSliders = Object.keys(CFG.DEF_WEIGHTS).map(function(k){
+    var f = CFG.FACTORS.filter(function(x){return x.id===k})[0];
+    return slider('weights', k, f.label, 0, 100, 1, State.weights[k], function(v){ return fx(v,0); });
+  }).join('');
+
+  return warnBlock(State.warnings) +
+    panel('Factor weights',
+      '<div class="grid g2">'+wSliders+'</div>' +
+      '<div class="row" style="margin-top:6px">' + btn('resetWeights','Reset to 25 each','ghost') +
+      '<span class="faint mono" style="font-size:9.5px">composite recomputes live</span></div>') +
+    '<div data-live="signal">' + signalBody() + '</div>';
+}
+
+/* ---- VALUATION ---- */
+function dcfBody(){
+  var m = State.metrics; if(!m) return '';
+  var d = runDcf(m, State.dcf);
+
+  if(d.error) return note('DCF not computed', '<div class="prose">'+esc(d.error)+'</div>', 'neg');
+
+  var mosCls = d.mos===null?'':(d.mos>0?'pos':'neg');
+  var cards = '<div class="cards">' +
+    card('Intrinsic value / share', px(d.perShare, m.currency), 'DCF, this assumption set', 'acc') +
+    card('Current price', px(d.price, m.currency), 'live quote', '') +
+    card('Margin of safety', d.mos===null?'--':pctS(d.mos,1), 'vs intrinsic value', mosCls) +
+    card('Upside to fair value', d.upside===null?'--':pctS(d.upside,1), 'vs current price', mosCls) +
+    card('Enterprise value', money(d.ev, m.currency), 'PV explicit + PV terminal', '') +
+    card('Terminal value share', pct(d.tvShare,1), d.tvHot?'above 75% — see note':'of enterprise value', d.tvHot?'warn':'') +
+    card('Starting FCF', money(d.fcf0, m.currency), m.latestFcfSource||'--', '') +
+    card('Shares outstanding', money(d.shares), 'profile2 x 1e6', '') +
+    '</div>';
+
+  var tvNote = d.tvHot ? note('Terminal value is ' + fx(d.tvShare,1) + '% of enterprise value',
+    '<div class="prose">Past roughly 75%, the valuation is driven by what happens after the forecast window rather than by the cash flows you actually modelled. ' +
+    'You are pricing the terminal assumption, not the business. Lengthen the fade period or lower terminal growth to see how much of this holds up.</div>', 'warn') : '';
+
+  var evNote = note('What this model does not include',
+    '<div class="prose">Free cash flow is discounted to an enterprise value and divided straight by share count. ' +
+    'There is no net-debt bridge — the endpoints used here do not return cash and total debt, so a company with large net debt will look better than it is, and one with a large net cash pile will look worse. ' +
+    'Treat the per-share figure as enterprise value per share.</div>', '');
+
+  var proj = d.rows.map(function(r){ return {label:'Y'+r.year, fcf:r.fcf, pv:r.pv}; });
+  var chart = comboChart(proj, {
+    bars:  [{key:'fcf', label:'Projected FCF', color:'--accent'}],
+    lines: [{key:'pv',  label:'Present value', color:'--pos'}],
+    fmtY: function(v){ return money(v); }, height:246, title:'projected free cash flow and present value'
+  });
+
+  var projTable = '<div class="scroll"><table class="tbl"><thead><tr>' +
+    '<th>Year</th><th class="n">Growth</th><th class="n">FCF</th><th class="n">Discount factor</th><th class="n">PV</th></tr></thead><tbody>' +
+    d.rows.map(function(r){
+      var df = Math.pow(1+d.assumptions.discount/100, r.year);
+      return '<tr><td>Y'+r.year+'</td><td class="n">'+esc(pct(r.growth,2))+'</td>' +
+        '<td class="n">'+esc(money(r.fcf))+'</td><td class="n">'+esc(fx(1/df,3))+'</td>' +
+        '<td class="n">'+esc(money(r.pv))+'</td></tr>';
+    }).join('') +
+    '<tr><td class="dim">Terminal</td><td class="n dim">'+esc(pct(d.assumptions.terminal,2))+'</td>' +
+      '<td class="n">'+esc(money(d.tv))+'</td><td class="n faint">—</td>' +
+      '<td class="n vio">'+esc(money(d.pvTv))+'</td></tr>' +
+    '</tbody></table></div>';
+
+  var g = sensitivityGrid(m, State.dcf);
+  var sens = '<div class="scroll"><table class="tbl sens"><thead><tr>' +
+    '<th style="text-align:left">Disc \\ term g</th>' +
+    g.ts.map(function(t){ return '<th class="n" style="text-align:center">'+esc(fx(t,1))+'%</th>'; }).join('') +
+    '</tr></thead><tbody>' +
+    g.cells.map(function(row,i){
+      return '<tr><td style="text-align:left;color:var(--dim);border:0">'+esc(fx(g.ds[i],1))+'%</td>' +
+        row.map(function(c){
+          if(c.value===null) return '<td class="na" title="discount rate must exceed terminal growth">—</td>';
+          var k = c.upside===null ? '' : (c.upside>20?'hi':(c.upside<-20?'lo':''));
+          return '<td class="'+k+(c.cur?' cur':'')+'" title="'+attr('discount '+fx(c.d,1)+'%, terminal '+fx(c.t,1)+'% → '+px(c.value,m.currency)+' ('+pctS(c.upside,0)+' vs price)')+'">' +
+            esc(px(c.value, m.currency)) + '<br><span style="font-size:9px;opacity:.75">'+esc(pctS(c.upside,0))+'</span></td>';
+        }).join('') + '</tr>';
+    }).join('') + '</tbody></table></div>' +
+    '<div class="faint mono" style="font-size:9.5px;margin-top:6px">' +
+    'Cell shows intrinsic value per share and change vs the current price. ' +
+    'Green above +20%, red below −20%. Outlined cell is the live assumption set. ' +
+    'Dashes are combinations where the discount rate does not exceed terminal growth.</div>';
+
+  return cards + tvNote + evNote +
+    '<div class="grid g2">' + panel('Projection', chart) + panelT('Cash flow schedule', projTable) + '</div>' +
+    panel('Sensitivity — discount rate ±2 vs terminal growth ±1', sens);
+}
+function viewValuation(m){
+  var s = State.dcf;
+  var sliders =
+    slider('dcf','growth',   'Initial FCF growth', -10, 40, 0.5, s.growth,   function(v){ return fx(v,1)+'%'; }) +
+    slider('dcf','fade',     'Fade period',          5, 20, 1,   s.fade,     function(v){ return fx(v,0)+' yrs'; }) +
+    slider('dcf','terminal', 'Terminal growth',      0,  4, 0.1, s.terminal, function(v){ return fx(v,1)+'%'; }) +
+    slider('dcf','discount', 'Discount rate',        5, 18, 0.25,s.discount, function(v){ return fx(v,2)+'%'; });
+
+  return warnBlock(State.warnings) +
+    panel('Assumptions',
+      '<div class="grid g2">'+sliders+'</div>' +
+      '<div class="row" style="margin-top:6px">' + btn('resetDcf','Reset assumptions','ghost') +
+      '<span class="faint mono" style="font-size:9.5px">growth fades linearly from the initial rate to the terminal rate; Gordon terminal value thereafter</span></div>') +
+    '<div data-live="dcf">' + dcfBody() + '</div>';
+}
+
+/* ---- THESIS ---- */
+/* Always-available written assessment, derived from the trace rather than
+   from a model. Works offline and needs no second API. */
+function viewLocalAssessment(m){
+  var sig = runSignal(m, State.weights);
+  var dcf = runDcf(m, State.dcf);
+  var a = localAssessment(m, sig, dcf);
+
+  /* Plain sentence first, the rule that produced it underneath in small type. */
+  var lines = function(arr, mark){
+    if(!arr.length) return '<div class="faint" style="font-size:11px;padding:2px">none</div>';
+    return '<ul class="findings">' + arr.map(function(x){
+      return '<li><span class="mk ' + mark + '">' + (mark==='y'?'✓':(mark==='n'?'✕':'–')) + '</span>' +
+        '<span><span class="pl">'+esc(x.plain)+'</span>' +
+        '<span class="tech">'+esc(x.rule)+' · now '+esc(x.value)+' · '+x.pts+' pts · '+esc(x.factor)+'</span></span></li>';
+    }).join('') + '</ul>';
+  };
+
+  var band = sig.band ? sig.band.label : 'NO SCORE';
+  var bandCls = sig.band ? sig.band.cls : '';
+  var plainVerdict = sig.composite===null
+    ? 'Not enough data came back to score ' + State.ticker + '.'
+    : (sig.composite>=72 ? 'It passes most of the tests you set.'
+     : sig.composite>=52 ? 'It passes the quality tests but not the price tests.'
+     : sig.composite>=34 ? 'It fails more of your tests than it passes.'
+     : 'It fails most of the tests you set.');
+
+  return '<div class="verdict">' +
+      '<div class="vscore ' + bandCls + '">' + esc(sig.composite===null?'--':sig.composite.toFixed(0)) +
+        '<span>/100</span></div>' +
+      '<div class="vtext">' +
+        '<div class="vband">' + tag(band, bandCls) +
+          '<span class="vplain">' + esc(plainVerdict) + '</span></div>' +
+        '<div class="vsub">' + esc(a.headline) + '</div>' +
+      '</div>' +
+      '<div class="vmeta"><div class="lbl">Data coverage</div>' +
+        '<div class="num" style="font-size:18px">' + esc(sig.coverage.toFixed(0)) + '%</div>' +
+        '<div class="faint" style="font-size:9.5px">' + sig.inputsPresent + '/' + sig.inputsTotal + ' inputs</div></div>' +
+    '</div>' +
+    panel('What the price model says',
+      '<div class="prose">'+esc(a.valuation)+'</div>',
+      '<span class="faint mono" style="font-size:9.5px">derived from the trace · no model involved</span>') +
+    '<div class="grid g2">' +
+      panel('In its favour — ' + a.strengths.length + ' tests passed', lines(a.strengths, 'y')) +
+      panel('Against it — ' + a.weaknesses.length + ' tests failed',
+        lines(a.weaknesses, 'n') +
+        (a.superseded.length
+          ? '<div class="hr"></div><div class="lbl">Already beaten — not held against it</div>' +
+            '<ul class="findings" style="margin-top:4px">' + a.superseded.map(function(x){
+              return '<li><span class="mk o">–</span><span><span class="pl dim">'+esc(x.plain)+'</span>' +
+                '<span class="tech">'+esc(x.rule)+' · it already passed a stricter version of this test</span></span></li>';
+            }).join('') + '</ul>'
+          : '')) +
+    '</div>' +
+    '<div class="grid g2">' +
+      panel('What would have to change',
+        (a.levers.length
+          ? '<ul class="findings">' + a.levers.slice(0,8).map(function(x){
+              return '<li><span class="mk o">→</span><span><span class="pl">'+esc(x.plain)+'</span>' +
+                '<span class="tech">worth '+x.pts+' pts in '+esc(x.factor)+'</span></span></li>';
+            }).join('') + '</ul>'
+          : '<div class="faint" style="font-size:11px">every test it can be scored on already passes</div>')) +
+      panel('Data gaps',
+        (a.gaps.length
+          ? '<ul class="bullets prose">' + a.gaps.map(function(x){ return '<li>'+esc(x)+'</li>'; }).join('') + '</ul>'
+          : '<div class="prose">No gaps: every input the rules need was present.</div>') +
+        (a.notAssessed.length
+          ? '<div class="faint mono" style="font-size:10px;margin-top:6px">Not assessed: ' +
+            esc(a.notAssessed.map(function(x){ return x.text; }).join(' · ')) + '</div>'
+          : '')) +
+    '</div>';
+}
+
+function viewThesis(m){
+  var localPart = viewLocalAssessment(m);
+
+  if(!AI_KEY){
+    return localPart + panel('Model thesis — optional',
+      note('No model key set',
+        '<div class="prose">This section additionally sends the computed metrics to ' + esc(CFG.AI_LABEL) + '. ' +
+        'The assessment above does not need it.<br><br>To enable, open this file in a text editor, find ' +
+        '<span class="mono acc">var AI_KEY</span> near the top of <b>section 1</b>, and paste a key from ' +
+        '<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">aistudio.google.com/apikey</a> between the quotes.</div>', 'acc'));
+  }
+
+  var t = State.thesis;
+  var curLens = CFG.LENSES.filter(function(x){ return x.id===State.lens; })[0] || CFG.LENSES[0];
+  var lensPicker = '<div class="lens">' +
+      '<div class="lbl" style="margin-bottom:4px">Analysis lens — changes what the model prioritises</div>' +
+      '<div class="lens-row">' + CFG.LENSES.map(function(l){
+        return '<button type="button" class="lens-b'+(l.id===State.lens?' on':'')+'" data-act="lens" data-lens="'+attr(l.id)+'" ' +
+          'title="'+attr(l.desc)+'">'+esc(l.label)+'</button>';
+      }).join('') + '</div>' +
+      '<div class="faint" style="font-size:11px;margin-top:5px">'+esc(curLens.desc)+'</div>' +
+    '</div>';
+
+  var head = lensPicker + '<div class="row" style="margin:8px 0 6px">' +
+    btn('thesis', t.status==='loading'?'Generating…':'Generate thesis', 'primary', t.status==='loading'?'disabled':'') +
+    (t.at ? '<span class="faint mono" style="font-size:9.5px">generated '+esc(t.at)+'</span>' : '') +
+    '<div class="sp"></div>' +
+    '<span class="faint mono" style="font-size:9.5px">'+esc(CFG.AI_LABEL)+'</span></div>' +
+    '<div class="faint" style="font-size:10.5px;line-height:1.5">' +
+    'The model is given only the figures this terminal computed and is instructed to reason from them alone, ' +
+    'to name gaps rather than fill them, and not to issue recommendations. It can still be wrong. Read it as a checklist, not a verdict. ' +
+    '<b>A lens changes which questions get asked of the same numbers — it does not train the model and adds no ability to predict prices.</b></div>';
+
+  if(t.status==='loading')
+    return localPart + panel('Model thesis', head + note('Working', '<span class="spin"></span> Sending metrics and waiting for the response…', 'acc'));
+  if(t.status==='error')
+    return localPart + panel('Model thesis', head + note('Thesis failed', '<div class="prose">'+esc(t.error)+'</div>', 'neg'));
+  if(t.status!=='done' || !t.data)
+    return localPart + panel('Model thesis', head + '<div class="faint mono" style="font-size:10.5px;padding:14px 0;text-align:center">' +
+      'No model thesis generated for ' + esc(State.ticker) + ' yet — the assessment above needs no model.</div>');
+
+  var d = t.data;
+  var conv = num(d.convictionScore);
+  var convCls = conv===null?'':(conv>=7?'pos':(conv>=4?'warn':'neg'));
+  var rank = {high:0, medium:1, low:2};
+  var risks = asArr(d.keyRisks).map(function(r){
+    if(typeof r === 'string') return {risk:r, severity:''};
+    return {risk: r && (r.risk||r.name||JSON.stringify(r)), severity: String((r&&r.severity)||'').toLowerCase()};
+  }).sort(function(a,b){
+    var ra = rank[a.severity]===undefined?3:rank[a.severity];
+    var rb = rank[b.severity]===undefined?3:rank[b.severity];
+    return ra-rb;
+  });
+  var moat = d.moat || {};
+  var strength = String(moat.strength||'').toLowerCase();
+
+  return localPart + panel('Model thesis', head +
+      (d.thesis ? '<div class="hr"></div><div class="prose">'+esc(d.thesis)+'</div>' : '')) +
+    '<div class="grid g2">' +
+      panel('Bull case', bullets(d.bullCase)) +
+      panel('Bear case', bullets(d.bearCase)) +
+    '</div>' +
+    panelT('Key risks, ranked',
+      risks.length ? '<table class="tbl"><thead><tr><th style="width:76px">Severity</th><th>Risk</th></tr></thead><tbody>' +
+        risks.map(function(r){
+          var k = r.severity==='high'?'neg':(r.severity==='medium'?'warn':(r.severity==='low'?'pos':''));
+          return '<tr><td>'+tag(r.severity||'unrated', k)+'</td><td class="prose" style="font-family:var(--sans)">'+esc(r.risk)+'</td></tr>';
+        }).join('') + '</tbody></table>'
+      : '<div class="faint mono" style="font-size:10.5px;padding:9px">none returned</div>') +
+    '<div class="grid g2">' +
+      panel('Moat',
+        '<div class="row" style="margin-bottom:6px">' +
+        tag(strength||'unrated', strength==='wide'?'pos':(strength==='narrow'?'warn':(strength==='none'?'neg':''))) +
+        '</div><div class="prose">'+esc(moat.assessment||'—')+'</div>') +
+      panel('Conviction',
+        '<div class="row" style="align-items:baseline;gap:10px">' +
+        '<div class="num '+convCls+'" style="font-size:33px;line-height:1">'+esc(conv===null?'--':fx(conv,1))+'</div>' +
+        '<span class="lbl">of 10 — evidence strength, not enthusiasm</span></div>' +
+        '<div class="hr"></div><div class="prose">'+esc(d.convictionReasoning||'—')+'</div>') +
+    '</div>' +
+    '<div class="grid g2">' +
+      panel('Data gaps the model identified',
+        bullets(d.dataGaps) +
+        '<div class="faint mono" style="font-size:9.5px;margin-top:6px">Gaps it names are worth more than the conclusions it draws.</div>') +
+      panel('What would change its mind', bullets(d.whatWouldChangeMyMind)) +
+    '</div>';
+}
+
+/* ---- SETTINGS ---- */
+function viewSettings(){
+  var mask = function(k){ return k ? k.slice(0,6) + '…' + k.slice(-4) + '  (' + k.length + ' chars)' : 'not set'; };
+
+  var v = State.verify, va = State.verifyAi;
+
+  return panel('API keys',
+      '<div class="row" style="margin-bottom:14px">' +
+        '<span class="lbl">Finnhub</span>' + (FINNHUB_KEY?tag('active','pos'):tag('missing','neg')) +
+        '<span class="mono faint" style="font-size:12px">'+esc(mask(FINNHUB_KEY))+'</span></div>' +
+      '<div class="row" style="flex-wrap:nowrap;gap:10px">' +
+        '<input id="in-finnhub" type="password" data-draft="finnhub" data-enter="saveFinnhub" autocomplete="off" ' +
+        'spellcheck="false" placeholder="Replace Finnhub key" value="'+attr(Draft.finnhub)+'">' +
+        btn('saveFinnhub', v.status==='checking'?'Checking…':'Verify & save','primary', v.status==='checking'?'disabled':'') +
+      '</div>' +
+      (v.status==='error' ? note('Not saved','<div class="prose">'+esc(v.msg)+'</div>','neg') : '') +
+      (v.status==='ok' ? note('Saved','<div class="prose">'+esc(v.msg)+'</div>','acc') : '') +
+
+      '<div class="hr"></div>' +
+      '<div class="row" style="margin-bottom:14px">' +
+        '<span class="lbl">'+esc(CFG.AI_LABEL)+'</span>' + (AI_KEY?tag('active','pos'):tag('not set','')) +
+        '<span class="mono faint" style="font-size:12px">'+esc(mask(AI_KEY))+'</span>' +
+        '<span class="faint" style="font-size:12px">optional — model section of Analysis</span></div>' +
+      '<div class="row" style="flex-wrap:nowrap;gap:10px">' +
+        '<input id="in-ai" type="password" data-draft="ai" data-enter="saveAi" autocomplete="off" ' +
+        'spellcheck="false" placeholder="Replace Gemini key" value="'+attr(Draft.ai)+'">' +
+        btn('saveAi', va.status==='checking'?'Checking…':'Verify & save','primary', va.status==='checking'?'disabled':'') +
+      '</div>' +
+      (va.status==='error' ? note('Not saved','<div class="prose">'+esc(va.msg)+'</div>','neg') : '') +
+      (va.status==='ok' ? note('Saved','<div class="prose">'+esc(va.msg)+'</div>','acc') : '') +
+
+      note('Why there is no key in the source',
+        '<div class="prose">Keys are kept in this browser under <span class="mono">'+esc(CFG.LS_KEYS)+'</span>, never written back ' +
+        'into the HTML. That is what makes this file safe to commit to a public repository. ' +
+        'If you ever paste a key directly into the source and commit it, git history keeps it permanently — ' +
+        'rotate it rather than trying to delete it.</div>','acc') +
+      '<div class="row">' + btn('clearKeys','Remove keys from this browser','danger') + '</div>' +
+      '<div class="faint" style="font-size:11.5px;margin-top:10px">Finnhub free tier: 60 calls/minute. ' +
+      'Each ticker load makes 4 calls; the watchlist adds ' + CFG.WATCHLIST.length + '; the live poll adds 4/min.</div>') +
+
+    panel('Reading the output',
+      '<div class="prose">' +
+      '<p><b>The trace is the product.</b> A composite score with no trace is a black box. Every rule on the Signal tab ' +
+      'shows whether it fired, the actual value it tested and the points it earned, so you can disagree with a specific line ' +
+      'rather than with a number.</p>' +
+      '<p><b>Coverage before score.</b> Check the coverage percentage first. A factor with under half its inputs present is ' +
+      'dropped from the composite entirely and the remaining weights are renormalised — missing data is never scored as ' +
+      'a zero. A 78 built on 40% coverage is not the same claim as a 78 built on 95%.</p>' +
+      '<p><b>Bands are your own thresholds.</b> Accumulate/Hold/Trim/Avoid are labels attached to score ranges you can change. ' +
+      'They are the rule set scoring itself, not advice.</p>' +
+      '<p><b>DCF is an assumption viewer.</b> The intrinsic value moves further on a 1% change in discount rate than on most ' +
+      'things you will learn about the business — that is what the sensitivity grid is for. If terminal value exceeds 75% of ' +
+      'enterprise value, you are modelling the assumption rather than the company.</p>' +
+      '<p><b>There is no backtest tab, deliberately.</b> Free providers serve restated fundamentals — figures as they look ' +
+      'now, not as they looked then. Scoring rules against restated history leaks the future and makes almost any rule set ' +
+      'look brilliant. A tab producing confident wrong numbers is worse than no tab.</p>' +
+      '<p><b>Data quirks worth knowing.</b> Market cap and share count come back in millions and are multiplied by 1e6. ' +
+      'Revenue and free cash flow have no absolute field on the metrics endpoint and are derived from per-share figures. ' +
+      'Annual statement line items are matched on concept-name substrings, which vary by filer — spot-check the ' +
+      'as-reported table on the Overview tab against the actual filing before leaning on a number.</p>' +
+      '</div>') +
+
+    panel('Saved settings',
+      '<div class="prose">Weights, DCF assumptions, the last ticker and the active tab are kept in this browser under ' +
+      '<span class="mono">' + esc(CFG.LS_DATA) + '</span>. Fetched market data is never stored.' +
+      (Store.ok ? '' : ' <b>This browser is currently blocking storage for local files, so nothing will persist between sessions.</b>') +
+      '</div><div class="row" style="margin-top:7px">' + btn('export','Copy analysis as markdown','primary') +
+      btn('clearAll','Reset saved settings','danger') + '</div>') +
+
+    '<div class="note"><b>Disclaimer</b><div class="prose">This is a modelling tool, not investment advice. ' +
+    'Nobody involved in it is a licensed financial advisor. Figures come from third-party APIs and may be wrong, stale or misattributed.</div></div>';
+}
+
+/* ---- root view ---- */
+function view(){
+  if(!FINNHUB_KEY) return viewSetup();
+
+  var body;
+  if(State.tab==='settings'){
+    body = viewSettings();
+  } else if(State.loading && !State.metrics){
+    body = panel('Loading', '<div class="mono dim" style="padding:24px;text-align:center">' +
+      '<span class="spin"></span> Fetching quote, profile, metrics and annual filings for ' + esc(State.ticker) + '…</div>');
+  } else if(State.fatal){
+    body = note('Could not load ' + State.ticker, '<div class="prose">'+esc(State.fatal)+'</div>', 'neg') +
+      warnBlock(State.warnings) +
+      '<div class="row">' + btn('load','Retry','primary') + btn('tabSettings','Check keys','ghost') + '</div>';
+  } else if(!State.metrics){
+    body = panel('No data loaded',
+      '<div class="mono dim" style="padding:20px;text-align:center">Enter a ticker and select ANALYZE.</div>');
+  } else {
+    var m = State.metrics;
+    body = State.tab==='overview'  ? viewOverview(m)
+         : State.tab==='signal'    ? viewSignal(m)
+         : State.tab==='valuation' ? viewValuation(m)
+         : State.tab==='thesis'    ? viewThesis(m)
+         : viewOverview(m);
+  }
+
+  return viewHeader() + '<main class="wrap">' + body +
+    '<div class="faint mono" style="font-size:9.5px;text-align:center;margin-top:20px;line-height:1.6">' +
+    'Data: Finnhub. A modelling tool, not investment advice — nobody involved is a licensed advisor.<br>' +
+    'API keys are stored in this file; do not share it as-is.</div></main>';
+}
+
+/* ==========================================================================
+   11  RENDER + EVENTS
+   ========================================================================== */
+var root = document.getElementById('root');
+
+/* Live regions: updated in place on slider drag so the slider element itself
+   is never replaced mid-gesture. */
+var LIVE = { signal: signalBody, dcf: dcfBody };
+
+function refreshLive(keys){
+  keys.forEach(function(k){
+    if(!LIVE[k]) return;
+    var el = root.querySelector('[data-live="'+k+'"]');
+    if(el) el.innerHTML = LIVE[k]();
+  });
+}
+
+/* Single render pass. Focus and caret are saved and restored, otherwise
+   typing into any field would break the moment something re-rendered. */
+function render(){
+  var a = document.activeElement;
+  var id = (a && a.id && root.contains(a)) ? a.id : null;
+  var selS = null, selE = null;
+  if(id){
+    try { if('selectionStart' in a){ selS = a.selectionStart; selE = a.selectionEnd; } } catch(e){}
+  }
+  var sy = window.scrollY || window.pageYOffset || 0;
+
+  root.innerHTML = view();
+
+  if(id){
+    var n = document.getElementById(id);
+    if(n){
+      try { n.focus({preventScroll:true}); } catch(e){ try{ n.focus(); }catch(e2){} }
+      if(selS!==null && typeof n.setSelectionRange==='function'){
+        try { n.setSelectionRange(selS, selE); } catch(e){}
+      }
+    }
+  }
+  window.scrollTo(0, sy);
+}
+
+/* Live poll. Ticks the clock and the "Ns ago" readout even when the quote
+   itself has not moved, so the display never looks fresher than it is. */
+var liveTimer = null;
+function startLive(){
+  if(liveTimer) window.clearInterval(liveTimer);
+  liveTimer = window.setInterval(function(){
+    if(State.live) refreshQuote();
+    else {
+      var a = document.activeElement;
+      if(!(a && (a.tagName==='INPUT' || a.tagName==='TEXTAREA'))) render();
+    }
+  }, CFG.LIVE_MS);
+}
+
+function toast(msg){
+  State.toast = msg;
+  render();
+  window.setTimeout(function(){ if(State.toast===msg){ State.toast=''; render(); } }, 2600);
+}
+
+root.addEventListener('click', function(e){
+  var el = e.target.closest ? e.target.closest('[data-act]') : null;
+  if(!el || !root.contains(el)) return;
+  var fn = ACT[el.getAttribute('data-act')];
+  if(fn){ e.preventDefault(); fn(el, e); }
+});
+
+/* Text fields update the draft only — no render, so typing is never
+   interrupted. Sliders update in place and refresh their live region. */
+root.addEventListener('input', function(e){
+  var t = e.target;
+  if(t.hasAttribute && t.hasAttribute('data-draft')){
+    Draft[t.getAttribute('data-draft')] = t.value;
+    return;
+  }
+  if(t.hasAttribute && t.hasAttribute('data-slider')) onSlider(t, false);
+});
+root.addEventListener('change', function(e){
+  var t = e.target;
+  if(t.hasAttribute && t.hasAttribute('data-slider')) onSlider(t, true);
+});
+root.addEventListener('keydown', function(e){
+  if(e.key!=='Enter') return;
+  var t = e.target;
+  if(t.hasAttribute && t.hasAttribute('data-enter')){
+    var fn = ACT[t.getAttribute('data-enter')];
+    if(fn){ e.preventDefault(); fn(t, e); }
+  }
+});
+
+var SLIDER_FMT = {
+  'weights': function(){ return function(v){ return fx(v,0); }; },
+  'dcf': function(key){
+    return key==='fade' ? function(v){ return fx(v,0)+' yrs'; }
+         : key==='discount' ? function(v){ return fx(v,2)+'%'; }
+         : function(v){ return fx(v,1)+'%'; };
+  }
+};
+function onSlider(el, commit){
+  var parts = el.getAttribute('data-slider').split('.');
+  var group = parts[0], key = parts[1];
+  var v = num(el.value);
+  if(v===null) return;
+  State[group][key] = v;
+
+  var out = document.getElementById('out-'+group+'-'+key);
+  if(out) out.textContent = SLIDER_FMT[group](key)(v);
+
+  refreshLive(group==='weights' ? ['signal'] : ['dcf']);
+  if(commit) persist();
+}
+
+/* ==========================================================================
+   12  ACTIONS
+   ========================================================================== */
+function fetchTicker(sym){
+  sym = String(sym||'').trim().toUpperCase().replace(/\s+/g,'');
+  if(!sym){ toast('enter a ticker'); return Promise.resolve(); }
+  Draft.ticker = sym;
+  State.ticker = sym;
+  State.loading = true;
+  State.fatal = null;
+  State.warnings = [];
+  State.thesis = {status:'idle', data:null, error:'', at:''};
+  if(State.tab==='settings') State.tab = 'overview';
+  set({}, {});
+
+  return loadAll(sym).then(function(r){
+    State.quote = r.quote; State.profile = r.profile; State.metric = r.metric; State.annuals = r.annuals;
+    State.warnings = r.warnings; State.fatal = r.fatal;
+    State.metrics = r.fatal ? null : computeMetrics();
+    State.loading = false;
+    set({}, {});
+  }).catch(function(err){
+    State.loading = false;
+    State.metrics = null;
+    State.fatal = (err && err.message) ? err.message : 'Unexpected failure while loading ' + sym + '.';
+    set({}, {});
+  });
+}
+
+var ACT = {
+  load: function(){ fetchTicker(Draft.ticker || State.ticker); },
+  chip: function(el){ fetchTicker(el.getAttribute('data-sym')); },
+  tab: function(el){ var id = el.getAttribute('data-tab'); setHash(id); set({tab:id}); },
+  tabSettings: function(){ setHash('settings'); set({tab:'settings'}); },
+  goAnalysis: function(){ setHash('thesis'); set({tab:'thesis'}); },
+  tabSignal: function(){ setHash('signal'); set({tab:'signal'}); },
+  lens: function(el){
+    var id = el.getAttribute('data-lens');
+    if(!CFG.LENSES.some(function(l){ return l.id===id; })) return;
+    State.lens = id;
+    /* A previous thesis was written under a different lens — drop it rather
+       than leave stale output sitting under a new label. */
+    if(State.thesis.status==='done') State.thesis = {status:'idle', data:null, error:'', at:''};
+    set({});
+  },
+  refreshWatch: function(){ fetchWatchlist(); render(); },
+  toggleLive: function(){
+    State.live = !State.live;
+    render();
+    if(State.live) refreshQuote();
+  },
+
+  toggleAll: function(){ State.showAll = !State.showAll; set({}); },
+
+  saveFinnhub: function(){
+    var k = String(Draft.finnhub||'').trim();
+    if(!k){ State.verify = {status:'error', msg:'Paste a key first.'}; render(); return; }
+    State.verify = {status:'checking', msg:''};
+    render();
+    verifyFinnhubKey(k).then(function(){
+      FINNHUB_KEY = k; Draft.finnhub = ''; persistKeys();
+      State.verify = {status:'ok', msg:'Verified against a live quote and saved to this browser.'};
+      render();
+      fetchTicker(State.ticker).then(function(){ fetchWatchlist(); startLive(); });
+    }).catch(function(err){
+      State.verify = {status:'error', msg:(err && err.message) || 'Verification failed.'};
+      render();
+    });
+  },
+
+  saveAi: function(){
+    var k = String(Draft.ai||'').trim();
+    if(!k){ State.verifyAi = {status:'error', msg:'Paste a key first.'}; render(); return; }
+    State.verifyAi = {status:'checking', msg:''};
+    render();
+    verifyAiKey(k).then(function(){
+      AI_KEY = k; Draft.ai = ''; persistKeys();
+      State.verifyAi = {status:'ok', msg:'Verified with a live test request and saved to this browser.'};
+      render();
+    }).catch(function(err){
+      State.verifyAi = {status:'error', msg:(err && err.message) || 'Verification failed.'};
+      render();
+    });
+  },
+
+  clearKeys: function(){
+    if(!window.confirm('Remove both API keys from this browser? You will land on the setup screen.')) return;
+    FINNHUB_KEY = ''; AI_KEY = '';
+    Draft.finnhub = ''; Draft.ai = '';
+    Store.del(CFG.LS_KEYS);
+    State.verify = {status:'idle', msg:''};
+    State.verifyAi = {status:'idle', msg:''};
+    render();
+  },
+
+  resetWeights: function(){ State.weights = Object.assign({}, CFG.DEF_WEIGHTS); set({}); },
+  resetDcf: function(){ State.dcf = Object.assign({}, CFG.DEF_DCF); set({}); },
+
+  clearAll: function(){
+    if(!window.confirm('Reset weights, DCF assumptions and the saved ticker to defaults?')) return;
+    Store.del(CFG.LS_DATA);
+    State.weights = Object.assign({}, CFG.DEF_WEIGHTS);
+    State.dcf = Object.assign({}, CFG.DEF_DCF);
+    toast('settings reset');
+  },
+
+  thesis: function(){
+    var m = State.metrics;
+    if(!m){ toast('load a ticker first'); return; }
+    if(!AI_KEY){ set({tab:'settings'}); return; }
+
+    var sig = runSignal(m, State.weights);
+    var dcf = runDcf(m, State.dcf);
+
+    var payload = {
+      ticker: State.ticker,
+      company: {name:m.name, exchange:m.exchange, industry:m.industry, currency:m.currency},
+      quote: {price:m.price, changePct:m.changePct, week52High:m.wk52High, week52Low:m.wk52Low, asOf:tsFmt(m.quoteTime)},
+      size: {marketCap:m.marketCap, sharesOutstanding:m.shares, revenueTTM:m.revenueTTM, freeCashFlow:m.latestFcf, fcfSource:m.latestFcfSource},
+      valuation: {peTTM:m.pe, priceToSales:m.priceToSales, pbQuarterly:m.pb, fcfYieldPct:m.fcfYield, beta:m.beta, dividendYieldPct:m.divYield},
+      growth: {revenueGrowthTTMYoyPct:m.revGrowth, revenueCagrPct:m.revenueCagr, epsGrowthPct:m.epsGrowth, yearsOfHistory:m.years.length},
+      quality: {grossMarginPct:m.grossMargin, operatingMarginPct:m.opMargin, netMarginPct:m.netMargin, roePct:m.roe, roiPct:m.roi, opMarginTrendPP:m.marginTrend},
+      balance: {debtToEquity:m.de, currentRatio:m.currentRatio},
+      annualHistory: m.years.map(function(y){
+        return {fy:y.year, revenue:y.revenue, grossProfit:y.grossProfit, operatingIncome:y.opIncome,
+                netIncome:y.netIncome, eps:y.eps, cfo:y.cfo, capex:y.capex, freeCashFlow:y.fcf,
+                grossMarginPct:y.grossMargin, operatingMarginPct:y.opMargin, netMarginPct:y.netMargin};
+      }),
+      signalEngine: {
+        compositeScore: sig.composite,
+        band: sig.band ? sig.band.label : null,
+        dataCoveragePct: sig.coverage,
+        factorsDroppedForMissingData: sig.factors.filter(function(f){return !f.included}).map(function(f){return f.label}),
+        factors: sig.factors.map(function(f){
+          return {factor:f.label, score:f.score, weight:f.weight, includedInComposite:f.included,
+                  inputsPresent:f.present, inputsTotal:f.inputs, missingInputs:f.missing,
+                  rules:f.trace.map(function(r){ return {rule:r.label, result:r.status, valueTested:r.value, pointsEarned:r.earned, pointsPossible:r.pts}; })};
+        })
+      },
+      dcf: dcf.error ? {error:dcf.error} : {
+        assumptions: dcf.assumptions,
+        intrinsicValuePerShare: dcf.perShare,
+        marginOfSafetyPct: dcf.mos,
+        terminalValueShareOfEVPct: dcf.tvShare,
+        note: 'No net-debt bridge: enterprise value is divided by share count directly.'
+      },
+      notes: [
+        'All figures were computed by the client from Finnhub endpoints. Nothing else is available to you.',
+        'null means the data was unavailable, not zero.',
+        'Percent fields are already in percent units.',
+        'Annual statement line items were matched on concept-name substrings and may be mislabelled for some filers.'
+      ]
+    };
+
+    State.thesis = {status:'loading', data:null, error:'', at:''};
+    render();
+
+    apiThesis(payload).then(function(data){
+      State.thesis = {status:'done', data:data, error:'', at: nowStamp()};
+      render();
+    }).catch(function(err){
+      State.thesis = {status:'error', data:null, error:(err && err.message) || 'Thesis request failed.', at:''};
+      render();
+    });
+  },
+
+  export: function(){
+    var md = buildMarkdown();
+    if(!md){ toast('nothing to export'); return; }
+    copyText(md).then(function(){ toast('copied to clipboard'); })
+                .catch(function(){ toast('copy failed — see console'); console.log(md); });
+  }
+};
+
+function copyText(text){
+  if(navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext!==false){
+    return navigator.clipboard.writeText(text).catch(function(){ return legacyCopy(text); });
+  }
+  return legacyCopy(text);
+}
+function legacyCopy(text){
+  return new Promise(function(res, rej){
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly','');
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+    document.body.appendChild(ta);
+    ta.select(); ta.setSelectionRange(0, text.length);
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch(e){ ok = false; }
+    document.body.removeChild(ta);
+    ok ? res() : rej(new Error('execCommand copy failed'));
+  });
+}
+
+function buildMarkdown(){
+  var m = State.metrics; if(!m) return '';
+  var sig = runSignal(m, State.weights);
+  var dcf = runDcf(m, State.dcf);
+  var L = [];
+  var row = function(a,b){ L.push('| ' + a + ' | ' + b + ' |'); };
+
+  L.push('# ' + State.ticker + (m.name ? ' — ' + m.name : ''));
+  L.push('');
+  L.push('_Generated ' + nowStamp() + ' · data: Finnhub · quote as of ' + tsFmt(m.quoteTime) + '_');
+  L.push('');
+  L.push('> A modelling tool, not investment advice. Nobody involved is a licensed advisor.');
+  L.push('');
+
+  L.push('## Quote');
+  L.push('');
+  L.push('| Field | Value |'); L.push('|---|---|');
+  row('Price', px(m.price,m.currency));
+  row('Change', sgn(m.change,2) + ' (' + pctS(m.changePct,2) + ')');
+  row('Open / High / Low', px(m.open) + ' / ' + px(m.high) + ' / ' + px(m.low));
+  row('Prev close', px(m.prevClose));
+  row('52-week range', px(m.wk52Low) + ' – ' + px(m.wk52High));
+  row('Exchange / industry', (m.exchange||'—') + ' / ' + (m.industry||'—'));
+  L.push('');
+
+  L.push('## Metrics');
+  L.push('');
+  L.push('| Metric | Value |'); L.push('|---|---|');
+  row('Market cap', money(m.marketCap,m.currency));
+  row('Shares outstanding', money(m.shares));
+  row('Revenue TTM (derived)', money(m.revenueTTM,m.currency));
+  row('Free cash flow', money(m.latestFcf,m.currency) + (m.latestFcfSource?' — '+m.latestFcfSource:''));
+  row('P/E TTM', m.pe===null?'--':fx(m.pe,1)+'x');
+  row('P/S', m.priceToSales===null?'--':fx(m.priceToSales,2)+'x');
+  row('P/B', m.pb===null?'--':fx(m.pb,2)+'x');
+  row('FCF yield', pct(m.fcfYield,2));
+  row('Revenue growth TTM YoY', pctS(m.revGrowth,1));
+  row('Revenue CAGR', pctS(m.revenueCagr,1) + (m.years.length?' over '+m.years.length+'y':''));
+  row('EPS growth', pctS(m.epsGrowth,1));
+  row('Gross / operating / net margin', pct(m.grossMargin,1)+' / '+pct(m.opMargin,1)+' / '+pct(m.netMargin,1));
+  row('Operating margin trend', m.marginTrend===null?'--':sgn(m.marginTrend,1)+'pp');
+  row('ROE / ROI', pct(m.roe,1)+' / '+pct(m.roi,1));
+  row('Current ratio', m.currentRatio===null?'--':fx(m.currentRatio,2)+'x');
+  row('Debt / equity', m.de===null?'--':fx(m.de,2)+'x');
+  row('Beta', fx(m.beta,2));
+  row('Dividend yield', pct(m.divYield,2));
+  L.push('');
+
+  L.push('## Signal engine');
+  L.push('');
+  L.push('**Composite ' + (sig.composite===null?'--':sig.composite.toFixed(1)) + '** — band: ' +
+    (sig.band?sig.band.label:'none') + ' · data coverage ' + sig.coverage.toFixed(0) + '% (' +
+    sig.inputsPresent + '/' + sig.inputsTotal + ' inputs) · ' + sig.included + ' of ' + sig.factors.length + ' factors in composite.');
+  L.push('');
+  L.push('Bands are the configured rule set scoring itself, not a recommendation. Factors with under half their inputs present are dropped and the remaining weights renormalised.');
+  L.push('');
+  sig.factors.forEach(function(f){
+    L.push('### ' + f.label + ' — ' + (f.score===null?'--':f.score.toFixed(1)) +
+      ' (' + f.earned + '/' + f.possible + ' pts, weight ' + fx(f.weight,0) + ', ' +
+      (f.included?'included':'EXCLUDED — only ' + f.present + '/' + f.inputs + ' inputs present') + ')');
+    L.push('');
+    L.push('| Rule | Result | Value tested | Points |'); L.push('|---|---|---|---|');
+    f.trace.forEach(function(r){
+      L.push('| ' + r.label + ' | ' + (r.status==='nodata'?'no data':r.status) + ' | ' + r.value + ' | ' +
+        (r.status==='nodata'?'excluded':(r.earned + '/' + r.pts)) + ' |');
+    });
+    if(f.missing.length){ L.push(''); L.push('_Missing inputs: ' + f.missing.join(', ') + '_'); }
+    L.push('');
+  });
+
+  L.push('## DCF');
+  L.push('');
+  if(dcf.error){
+    L.push('Not computed: ' + dcf.error);
+  } else {
+    L.push('| Field | Value |'); L.push('|---|---|');
+    row('Initial growth', pct(dcf.assumptions.growth,1));
+    row('Fade period', dcf.assumptions.fade + ' years');
+    row('Terminal growth', pct(dcf.assumptions.terminal,1));
+    row('Discount rate', pct(dcf.assumptions.discount,2));
+    row('Starting FCF', money(dcf.fcf0,m.currency));
+    row('Intrinsic value / share', px(dcf.perShare,m.currency));
+    row('Current price', px(dcf.price,m.currency));
+    row('Margin of safety', pctS(dcf.mos,1));
+    row('Terminal value / EV', pct(dcf.tvShare,1) + (dcf.tvHot?' — above 75%, the result is driven by the terminal assumption':''));
+    L.push('');
+    L.push('_No net-debt bridge: enterprise value is divided by share count directly._');
+  }
+  L.push('');
+
+  if(m.years.length){
+    L.push('## Annual filings as reported');
+    L.push('');
+    L.push('| FY | Revenue | Operating income | Net income | EPS | FCF |'); L.push('|---|---|---|---|---|---|');
+    m.years.slice().reverse().forEach(function(y){
+      L.push('| FY' + y.year + ' | ' + money(y.revenue) + ' | ' + money(y.opIncome) + ' | ' +
+        money(y.netIncome) + ' | ' + fx(y.eps,2) + ' | ' + money(y.fcf) + ' |');
+    });
+    L.push('');
+  }
+
+  var t = State.thesis;
+  if(t.status==='done' && t.data){
+    var d = t.data;
+    L.push('## Thesis (' + CFG.AI_LABEL + ')');
+    L.push('');
+    if(d.thesis){ L.push(String(d.thesis)); L.push(''); }
+    var sec = function(title, items){
+      L.push('**' + title + '**'); L.push('');
+      asArr(items).forEach(function(x){ L.push('- ' + (typeof x==='string'?x:JSON.stringify(x))); });
+      L.push('');
+    };
+    sec('Bull case', d.bullCase);
+    sec('Bear case', d.bearCase);
+    L.push('**Key risks**'); L.push('');
+    asArr(d.keyRisks).forEach(function(r){
+      if(typeof r==='string') L.push('- ' + r);
+      else L.push('- [' + String((r&&r.severity)||'unrated') + '] ' + String((r&&r.risk)||''));
+    });
+    L.push('');
+    if(d.moat){ L.push('**Moat (' + String(d.moat.strength||'unrated') + ')** — ' + String(d.moat.assessment||'')); L.push(''); }
+    L.push('**Conviction ' + fx(num(d.convictionScore),1) + '/10** — ' + String(d.convictionReasoning||''));
+    L.push('');
+    sec('Data gaps identified by the model', d.dataGaps);
+    sec('What would change its mind', d.whatWouldChangeMyMind);
+  }
+
+  if(State.warnings.length){
+    L.push('## Data warnings');
+    L.push('');
+    State.warnings.forEach(function(w){ L.push('- ' + w); });
+    L.push('');
+  }
+
+  L.push('---');
+  L.push('');
+  L.push('A modelling tool, not investment advice. Nobody involved is a licensed advisor. ' +
+    'Figures come from third-party APIs and may be wrong, stale or misattributed. ' +
+    'No backtest is included by design: free providers serve restated fundamentals, and scoring rules against them leaks the future.');
+
+  return L.join('\n');
+}
+
+/* --- boot --- */
+if(window.addEventListener) window.addEventListener('hashchange', function(){
+  var h = tabFromHash();
+  if(h && h !== State.tab) set({tab:h});
+});
+restore();
+render();
+if(FINNHUB_KEY) fetchTicker(State.ticker).then(function(){ fetchWatchlist(); startLive(); });
+
+})();
+</script>
+</body>
+</html>

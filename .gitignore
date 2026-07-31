@@ -1,0 +1,17 @@
+# Never commit a keyed copy of the app.
+# Keep your personal build as stock.local.html and it stays out of git.
+stock.local.html
+*.local.html
+.env
+.env.*
+secrets.json
+keys.json
+
+# Scratch / OS / editor
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+node_modules/
