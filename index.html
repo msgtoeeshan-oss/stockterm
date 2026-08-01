@@ -22,16 +22,18 @@
 <meta name="twitter:image" content="https://msgtoeeshan-oss.github.io/stockterm/docs/screenshot-analysis.png">
 
 <!-- Inline favicon: no external file, keeps the app self-contained -->
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%238b7cf6'/%3E%3Cstop offset='1' stop-color='%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23g)'/%3E%3Cpath d='M14 42 L26 30 L34 36 L50 20' stroke='%23fff' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23000'/%3E%3Crect x='2' y='2' width='60' height='60' rx='12' fill='none' stroke='%23fafafa' stroke-width='3'/%3E%3Cpath d='M14 44 L26 31 L35 38 L50 19' stroke='%23fafafa' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
 /* ── design tokens ─────────────────────────────────────────────── */
+/* Monochrome shell. Colour is reserved for meaning: green and red appear only
+   on real gains, losses and pass/fail. Everything structural is greyscale. */
 :root{
-  --bg:#0a0813;        --panel:#14121f;     --panel-2:#1b1829;
-  --well:#0d0b16;      --line:#272238;      --line-2:#372f4d;
-  --text:#eef0f7;      --dim:#9a94b0;       --faint:#6a6482;
+  --bg:#000000;        --panel:#0a0a0a;     --panel-2:#151515;
+  --well:#050505;      --line:#1e1e1e;      --line-2:#2f2f2f;
+  --text:#fafafa;      --dim:#8c8c8c;       --faint:#5a5a5a;
   --pos:#34d399;       --neg:#fb7185;       --warn:#fbbf24;
-  --accent:#8b7cf6;    --accent-2:#ec4899;  --violet:#a78bfa;   --tag:#fbbf24;
-  --grad:linear-gradient(120deg,#8b7cf6,#ec4899);
+  --accent:#fafafa;    --accent-2:#fafafa;  --violet:#fafafa;   --tag:#fbbf24;
+  --grad:#fafafa;
   --r:16px;            --r-sm:11px;         --r-pill:999px;
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono","Courier New",monospace;
   --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
@@ -42,14 +44,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13
      -webkit-font-smoothing:antialiased;min-height:100vh}
 /* ambient glow, fixed so it never scrolls or costs layout */
 body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
-  background:radial-gradient(58% 42% at 12% 0%,rgba(139,124,246,.20),transparent 62%),
-             radial-gradient(48% 38% at 92% 4%,rgba(236,72,153,.13),transparent 60%)}
+  background:radial-gradient(70% 50% at 50% 0%,rgba(255,255,255,.055),transparent 70%)}
 #root{position:relative;z-index:1}
 a{color:var(--accent);text-decoration:none}
 a:hover{text-decoration:underline}
 h1,h2,h3{margin:0;font-weight:600}
 p{margin:0 0 7px}
-::selection{background:rgba(74,144,226,.3)}
+::selection{background:rgba(255,255,255,.22)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 
 .mono,.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
@@ -67,7 +68,7 @@ p{margin:0 0 7px}
 .hdr-in{max-width:1360px;margin:0 auto;padding:0 18px 12px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .logo{display:flex;align-items:center;gap:9px;white-space:nowrap}
 .logo .mk{width:30px;height:30px;border-radius:9px;background:var(--grad);display:flex;
-  align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff;flex:none}
+  align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#000;flex:none}
 .logo b{font-size:17px;font-weight:700;letter-spacing:-.02em;color:var(--text);font-family:var(--sans)}
 .logo em{display:none}
 .search{flex:1;min-width:180px;max-width:340px;position:relative}
@@ -77,7 +78,7 @@ p{margin:0 0 7px}
 .hdr .search input[type=text]::placeholder{color:var(--faint)}
 .hdr .search input[type=text]:focus{border-color:var(--accent);background:var(--panel)}
 .search svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);opacity:.65}
-.hdr .go{background:var(--grad);border:0;color:#fff;font-family:var(--sans);font-size:12.5px;
+.hdr .go{background:var(--grad);border:0;color:#000;font-family:var(--sans);font-size:12.5px;
   font-weight:600;padding:10px 20px;border-radius:var(--r-pill);cursor:pointer}
 .hdr .go:hover{filter:brightness(1.12)}
 .hdr .go.alt{background:var(--panel-2);border:1px solid var(--line-2);color:var(--dim)}
@@ -99,7 +100,7 @@ button{font-family:var(--sans);font-size:12px;font-weight:600;
   background:var(--panel-2);color:var(--text);border:1px solid var(--line-2);
   padding:8px 15px;border-radius:var(--r-pill);cursor:pointer;transition:border-color .15s,color .15s}
 button:hover:not([disabled]){border-color:var(--accent);color:#fff}
-button.primary{background:var(--grad);border:0;color:#fff}
+button.primary{background:var(--grad);border:0;color:#000}
 button.primary:hover:not([disabled]){filter:brightness(1.12)}
 button.danger:hover:not([disabled]){border-color:var(--neg);color:var(--neg)}
 button.ghost{background:transparent;color:var(--dim)}
@@ -153,8 +154,7 @@ input:focus{border-color:var(--accent);outline:none}
 
 /* ── verdict header (Analysis tab) ─────────────────────────────── */
 .verdict{margin:12px 0;padding:26px 28px;
-  background:linear-gradient(120deg,rgba(139,124,246,.16),rgba(236,72,153,.09)),var(--panel);
-  border:1px solid var(--line-2);border-radius:var(--r)}
+  background:var(--panel);border:1px solid var(--line-2);border-radius:var(--r)}
 .vtop{display:flex;align-items:center;gap:26px;flex-wrap:wrap}
 /* factor bars */
 .fbars{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;
@@ -192,7 +192,7 @@ input:focus{border-color:var(--accent);outline:none}
 .lens-b{font-family:var(--sans);font-size:12.5px;font-weight:600;padding:9px 17px;
   background:var(--panel-2);border:1px solid var(--line-2);color:var(--dim);border-radius:var(--r-pill)}
 .lens-b:hover{color:var(--text);border-color:var(--dim)}
-.lens-b.on{background:var(--grad);border-color:transparent;color:#fff}
+.lens-b.on{background:var(--grad);border-color:transparent;color:#000}
 .qlist{margin:10px 0 0;padding-left:20px;color:var(--faint);font-size:12px;line-height:1.65}
 .qlist li{margin-bottom:2px}
 
@@ -201,7 +201,7 @@ input:focus{border-color:var(--accent);outline:none}
 .tbl.screen th.sortable.on{color:var(--violet)}
 .tbl.screen .caret{font-size:9px}
 .tbl.screen tr.rowlink{cursor:pointer}
-.tbl.screen tr.cur{background:rgba(139,124,246,.10)}
+.tbl.screen tr.cur{background:var(--panel-2)}
 .scorepill{display:inline-block;min-width:38px;text-align:center;font-family:var(--mono);
   font-size:13px;font-weight:700;padding:3px 8px;border-radius:var(--r-pill);
   background:var(--panel-2);border:1px solid var(--line-2);color:var(--dim)}
@@ -213,7 +213,7 @@ input:focus{border-color:var(--accent);outline:none}
 .symchip{font-family:var(--mono);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:var(--r-pill);
   background:var(--panel-2);border:1px solid var(--line);color:var(--dim)}
 .symchip:hover{color:var(--text);border-color:var(--line-2)}
-.symchip.on{background:var(--grad);border-color:transparent;color:#fff}
+.symchip.on{background:var(--grad);border-color:transparent;color:#000}
 
 .demobar.stale{background:rgba(251,113,133,.10);border-color:rgba(251,113,133,.38)}
 .demobar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 0;padding:12px 18px;
@@ -236,10 +236,10 @@ input:focus{border-color:var(--accent);outline:none}
 /* ── document drop zone ────────────────────────────────────────── */
 .drop{border:1.5px dashed var(--line-2);border-radius:var(--r);padding:24px 20px;text-align:center;
   background:var(--panel-2);transition:border-color .15s,background .15s}
-.drop.over{border-color:var(--accent);background:rgba(139,124,246,.10)}
+.drop.over{border-color:var(--accent);background:var(--panel)}
 .drop-t{font-family:var(--sans);font-size:14.5px;font-weight:650;color:var(--text);margin-bottom:6px}
 .drop-s{font-family:var(--sans);font-size:12.5px;line-height:1.6;color:var(--dim);max-width:560px;margin:0 auto}
-.filebtn{display:inline-block;font-family:var(--sans);font-size:12.5px;font-weight:600;color:#fff;
+.filebtn{display:inline-block;font-family:var(--sans);font-size:12.5px;font-weight:600;color:#000;
   background:var(--grad);padding:10px 18px;border-radius:var(--r-pill);cursor:pointer;border:0}
 .filebtn:hover{filter:brightness(1.12);text-decoration:none}
 .filebtn.alt{background:var(--panel);border:1px solid var(--line-2);color:var(--dim)}
@@ -263,12 +263,11 @@ input:focus{border-color:var(--accent);outline:none}
 
 /* ── call-to-action bar ────────────────────────────────────────── */
 .cta{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:12px 0;padding:18px 22px;
-  background:linear-gradient(120deg,rgba(139,124,246,.18),rgba(236,72,153,.10)),var(--panel);
-  border:1px solid var(--line-2);border-radius:var(--r)}
+  background:var(--panel);border:1px solid var(--line-2);border-radius:var(--r)}
 .cta .t{font-family:var(--sans);font-size:15px;font-weight:650;letter-spacing:-.015em;color:var(--text)}
 .cta .s{font-family:var(--sans);font-size:12.5px;color:var(--dim);margin-top:3px}
-.cta button{background:var(--grad);border:0;color:#fff;font-size:12.5px;padding:10px 18px}
-.cta button:hover{filter:brightness(1.12);color:#fff}
+.cta button{background:var(--grad);border:0;color:#000;font-size:12.5px;padding:10px 18px}
+.cta button:hover{opacity:.85;color:#000}
 .cta button.ghost{background:var(--panel-2);border:1px solid var(--line-2);color:var(--dim)}
 .cta button.ghost:hover{color:var(--text);filter:none}
 
@@ -300,7 +299,7 @@ input:focus{border-color:var(--accent);outline:none}
 .tag.pos{color:#04231a;background:var(--pos);border-color:var(--pos)}
 .tag.neg{color:#2a0910;background:var(--neg);border-color:var(--neg)}
 .tag.warn{color:#291c02;background:var(--warn);border-color:var(--warn)}
-.tag.acc{color:#fff;background:var(--grad);border-color:transparent}
+.tag.acc{color:#000;background:var(--grad);border-color:transparent}
 .note{border:1px solid var(--line);border-left:3px solid var(--dim);background:var(--panel-2);
   padding:13px 16px;border-radius:var(--r-sm);margin:12px 0;font-size:13px}
 .note.warn{border-left-color:var(--warn)} .note.neg{border-left-color:var(--neg)}
@@ -316,10 +315,10 @@ input[type=range]{-webkit-appearance:none;appearance:none;width:100%;background:
   height:22px;padding:0;border:0;margin:5px 0 0;cursor:pointer}
 input[type=range]::-webkit-slider-runnable-track{height:5px;background:var(--line-2);border-radius:99px}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;
-  background:#fff;border:0;margin-top:-6px;box-shadow:0 0 0 4px rgba(139,124,246,.35)}
+  background:#fff;border:0;margin-top:-6px;box-shadow:0 0 0 4px rgba(255,255,255,.18)}
 input[type=range]::-moz-range-track{height:5px;background:var(--line-2);border-radius:99px}
 input[type=range]::-moz-range-thumb{width:17px;height:17px;border:0;border-radius:50%;background:#fff;
-  box-shadow:0 0 0 4px rgba(139,124,246,.35)}
+  box-shadow:0 0 0 4px rgba(255,255,255,.18)}
 
 /* ── sensitivity grid ──────────────────────────────────────────── */
 .sens td,.sens th{text-align:center;padding:9px 6px;font-size:12px}
@@ -347,6 +346,70 @@ input[type=range]::-moz-range-thumb{width:17px;height:17px;border:0;border-radiu
 .spin{display:inline-block;width:8px;height:8px;border:1.5px solid var(--line-2);
   border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-1px}
 @keyframes sp{to{transform:rotate(360deg)}}
+
+/* ── analyst chat ───────────────────────────────────────────────────────── */
+.chat-fab{position:fixed;right:20px;bottom:20px;z-index:60;display:flex;align-items:center;gap:8px;
+  background:var(--text);color:var(--bg);border:0;border-radius:var(--r-pill);
+  padding:14px 20px;font-size:13.5px;font-weight:650;letter-spacing:-.01em;
+  box-shadow:0 8px 28px rgba(0,0,0,.5);cursor:pointer}
+.chat-fab:hover{color:var(--bg);transform:translateY(-1px)}
+.chat-fab-i{font-size:11px;opacity:.6}
+
+.chat-panel{position:fixed;right:20px;bottom:20px;z-index:60;width:min(420px,calc(100vw - 32px));
+  max-height:min(660px,calc(100vh - 48px));display:flex;flex-direction:column;
+  background:var(--panel);border:1px solid var(--line-2);border-radius:var(--r);
+  box-shadow:0 20px 60px rgba(0,0,0,.62);overflow:hidden}
+.chat-head{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:16px 18px;border-bottom:1px solid var(--line);flex:none}
+.chat-title{font-size:14px;font-weight:650;letter-spacing:-.015em}
+.chat-sub{font-size:11px;color:var(--faint);margin-top:2px;font-family:var(--mono)}
+.chat-x{background:transparent;border:0;color:var(--dim);font-size:14px;padding:6px 9px;
+  border-radius:8px;cursor:pointer;line-height:1}
+.chat-x:hover{background:var(--panel-2);color:var(--text)}
+
+.chat-body{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:18px}
+.chat-body::-webkit-scrollbar{width:8px}
+.chat-body::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:8px}
+
+.chat-u{display:flex;justify-content:flex-end}
+.chat-u-b{background:var(--panel-2);border:1px solid var(--line-2);border-radius:14px 14px 4px 14px;
+  padding:10px 14px;font-size:13px;line-height:1.5;max-width:85%}
+.chat-a{font-size:13.5px;line-height:1.6}
+.chat-txt{color:var(--text)}
+.chat-cites{margin-top:10px;font-family:var(--mono);font-size:10.5px;line-height:1.7;
+  color:var(--faint);background:var(--well);border:1px solid var(--line);border-radius:8px;
+  padding:8px 11px;overflow-x:auto;word-break:break-word}
+.chat-j{margin-top:12px;padding:11px 13px;border-left:2px solid var(--warn);
+  background:rgba(251,191,36,.06);border-radius:0 8px 8px 0;font-size:13px;line-height:1.55}
+.chat-j-l{display:block;font-family:var(--sans);font-size:9.5px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.chat-gaps{margin-top:12px;padding:11px 13px;border-left:2px solid var(--line-2);
+  background:var(--panel-2);border-radius:0 8px 8px 0;font-size:12.5px}
+.chat-gaps .chat-j-l{color:var(--dim)}
+.chat-gaps ul{margin:0;padding-left:16px;line-height:1.6;color:var(--dim)}
+.chat-err{color:var(--neg);font-size:12.5px;line-height:1.55;padding:10px 13px;
+  border:1px solid rgba(251,113,133,.35);border-radius:8px;background:rgba(251,113,133,.07)}
+
+.chat-empty{text-align:left}
+.chat-empty-h{font-size:16px;font-weight:650;letter-spacing:-.02em;margin-bottom:8px}
+.chat-empty-p{font-size:12.5px;line-height:1.6;color:var(--dim)}
+.chat-link{font-size:12.5px;color:var(--violet)}
+.chat-seeds{display:flex;flex-direction:column;gap:6px;margin-top:18px}
+.chat-seed{text-align:left;background:var(--panel-2);border:1px solid var(--line);color:var(--dim);
+  font-size:12.5px;font-weight:500;padding:10px 13px;border-radius:10px;line-height:1.4}
+.chat-seed:hover{color:var(--text);border-color:var(--line-2)}
+
+.chat-foot{display:flex;gap:8px;padding:14px 16px;border-top:1px solid var(--line);flex:none}
+.chat-foot input[type=text]{flex:1;font-family:var(--sans);font-size:13px;padding:11px 14px;
+  border-radius:var(--r-pill);background:var(--well)}
+.chat-send{flex:none;width:40px;height:40px;border-radius:50%;background:var(--text);color:var(--bg);
+  border:0;font-size:15px;cursor:pointer;padding:0}
+.chat-send:hover:not([disabled]){color:var(--bg);opacity:.85}
+
+@media(max-width:520px){
+  .chat-panel{right:8px;left:8px;bottom:8px;width:auto;max-height:calc(100vh - 16px)}
+  .chat-fab{right:12px;bottom:12px}
+}
 
 /* ── ORACLE: Igloo monochrome. Scoped to .iglo so the rest of the app is
       untouched. 8px spacing scale, system stack, black/white only. ───────── */
@@ -652,6 +715,25 @@ var CFG = {
      show:function(m){return fx(m.de,2)+'x'}}
   ],
 
+  /* Chat persona. Two registers, kept visibly apart: what the data says, and
+     what a value investor would make of it. The second never masquerades as
+     the first. */
+  CHAT_ROLE:
+    'You answer as a long-horizon value investor in the tradition of Warren Buffett: plain English,\n' +
+    'short sentences, no jargon without explanation, no hype, no price predictions.\n\n' +
+    'You speak in TWO registers and must never blur them.\n\n' +
+    'FACTS — anything you assert about this company. Every one must cite the evidence:\n' +
+    '  [SOURCE-ID, field]: value\n' +
+    'If the evidence does not contain it, do not assert it. Say what is missing instead and add it\n' +
+    'to notInData. Your training knowledge about this company does not count as evidence. Naming\n' +
+    'products, customers, competitors or strategy is not supported by a ticker or an industry label.\n\n' +
+    'JUDGEMENT — how a value investor would read those facts: durability of the moat, owner\n' +
+    'earnings quality, margin of safety, circle of competence, temperament. This is reasoning, not\n' +
+    'fact, and is rendered separately to the reader. Ground it in the figures you just cited.\n\n' +
+    'You may be asked to explain a number on screen, to argue against the user, or a general\n' +
+    'question. If asked whether to buy or sell, decline the instruction and instead lay out what\n' +
+    'the evidence supports and what would have to be true. Never give a buy or sell directive.',
+
   DEF_WEIGHTS: {valuation:25, growth:25, quality:25, balance:25},
   DEF_DCF:     {growth:8, fade:10, terminal:2.5, discount:9},
 
@@ -889,6 +971,9 @@ var State = {
   wantSetup: false,
   notBundled:'',
   suggest:   [],
+  chat:      [],
+  chatOpen:  false,
+  chatBusy:  false,
   sort:      'score',
   bandFilter:'',
   deb:       {status:'idle', bull:null, bear:null, judge:null, error:'', at:''},
@@ -909,7 +994,7 @@ var State = {
 
 /* Uncommitted text-field contents. Text inputs never trigger a render, so
    their live value lives here and views read from it. */
-var Draft = {ticker:'', finnhub:'', ai:''};
+var Draft = {ticker:'', finnhub:'', ai:'', chat:''};
 
 function persist(){
   Store.set(CFG.LS_DATA, JSON.stringify({
@@ -1179,6 +1264,140 @@ function apiJudge(evidence, bull, bear){
         try { return parseLooseJson(text); }
         catch(e){ throw new ApiErr('Could not parse the judge output as JSON' +
           (cand.finishReason==='MAX_TOKENS'?' — it was cut off at the token limit.':'.'), 0); }
+      });
+  });
+}
+
+/* Everything the chat is allowed to know: the loaded company in full, every
+   bundled company in one line each, and any uploaded filing text. */
+function chatEvidence(){
+  var m = State.metrics;
+  var L = [];
+
+  if(m){
+    L.push('LOADED COMPANY — ' + State.ticker + (m.name ? ' (' + m.name + ')' : ''));
+    L.push('[QUOTE] price=' + m.price + ' change=' + m.changePct + '% currency=' + m.currency +
+           ' asOf=' + tsFmt(m.quoteTime));
+    var f = [['peTTM',m.pe],['priceToSales',m.priceToSales],['pbQuarterly',m.pb],
+             ['marketCap',m.marketCap],['sharesOutstanding',m.shares],['revenueTTM',m.revenueTTM],
+             ['freeCashFlow',m.latestFcf],['fcfYieldPct',m.fcfYield],['revenueGrowthPct',m.revGrowth],
+             ['revenueCagrPct',m.revenueCagr],['epsGrowthPct',m.epsGrowth],['grossMarginPct',m.grossMargin],
+             ['operatingMarginPct',m.opMargin],['netMarginPct',m.netMargin],['roePct',m.roe],
+             ['roicPct',m.roi],['debtToEquity',m.de],['currentRatio',m.currentRatio],
+             ['opMarginTrendPP',m.marginTrend],['beta',m.beta],['dividendYieldPct',m.divYield]];
+    /* Round before handing over: the model quotes these verbatim, and
+       "2.17688892418919" reads as false precision on a derived ratio. */
+    var rnd = function(v){
+      var n = num(v); if(n===null) return null;
+      var a = Math.abs(n);
+      return a >= 1e6 ? Math.round(n) : (a >= 100 ? +n.toFixed(1) : +n.toFixed(2));
+    };
+    L.push('[METRIC] ' + f.filter(function(p){ return p[1]!==null && p[1]!==undefined; })
+      .map(function(p){ return p[0]+'='+rnd(p[1]); }).join(' '));
+
+    (m.years||[]).forEach(function(y){
+      L.push('[FILING-FY' + y.year + '] revenue=' + y.revenue + ' grossProfit=' + y.grossProfit +
+        ' operatingIncome=' + y.opIncome + ' netIncome=' + y.netIncome + ' eps=' + y.eps +
+        ' cfo=' + y.cfo + ' capex=' + y.capex + ' freeCashFlow=' + y.fcf);
+    });
+
+    var sig = runSignal(m, State.weights);
+    L.push('[SCORE] composite=' + (sig.composite===null?'null':sig.composite.toFixed(1)) +
+      ' band=' + (sig.band?sig.band.label:'none') + ' coveragePct=' + sig.coverage.toFixed(0));
+    sig.factors.forEach(function(x){
+      L.push('[SCORE-' + x.id.toUpperCase() + '] score=' + (x.score===null?'null':x.score.toFixed(1)) +
+        ' included=' + x.included + ' rules=' +
+        x.trace.map(function(r){ return r.label+'('+r.status+' '+r.value+')'; }).join('; '));
+    });
+    var d = runDcf(m, State.dcf);
+    L.push('[DCF] ' + (d.error ? 'notComputed="' + d.error + '"'
+      : 'intrinsicPerShare=' + d.perShare.toFixed(2) + ' marginOfSafetyPct=' + d.mos.toFixed(1) +
+        ' terminalShareOfEVPct=' + d.tvShare.toFixed(1) +
+        ' assumptions=' + JSON.stringify(d.assumptions) + ' note="no net-debt bridge"'));
+    L.push('');
+  }
+
+  var syms = demoSymbols();
+  if(syms.length){
+    L.push('PEER SET — ' + syms.length + ' companies, same figures, one line each');
+    screenAll().forEach(function(r){
+      L.push('[PEER-' + r.sym + '] name="' + r.name + '" score=' +
+        (r.score===null?'null':r.score.toFixed(0)) + ' band=' + (r.band?r.band.label:'none') +
+        ' pe=' + (r.m.pe===null?'na':fx(r.m.pe,1)) +
+        ' fcfYield=' + (r.m.fcfYield===null?'na':fx(r.m.fcfYield,1)) +
+        ' revGrowth=' + (r.m.revGrowth===null?'na':fx(r.m.revGrowth,1)) +
+        ' opMargin=' + (r.m.opMargin===null?'na':fx(r.m.opMargin,1)) +
+        ' roe=' + (r.m.roe===null?'na':fx(r.m.roe,0)) +
+        ' debtEquity=' + (r.m.de===null?'na':fx(r.m.de,2)) +
+        ' marketCap=' + (r.m.marketCap||'na'));
+    });
+    L.push('');
+  }
+
+  var docChars = 0;
+  (State.docs||[]).forEach(function(doc){
+    doc.sections.forEach(function(s){
+      if(docChars >= 24000) return;
+      var body = s.text.slice(0, 24000 - docChars);
+      docChars += body.length;
+      L.push('[DOC-' + doc.tag + '-ITEM' + s.id + '] ' + doc.name + ' — ' + s.title);
+      L.push('"""'); L.push(body); L.push('"""');
+      if(body.length < s.text.length) L.push('(truncated — text beyond this point was not supplied)');
+      L.push('');
+    });
+  });
+
+  if(!docChars) L.push('NO FILING TEXT SUPPLIED. You have no risk factors, no business description, ' +
+    'no management commentary. Questions needing them must be answered "not in the data".');
+
+  return L.join('\n');
+}
+
+/* One chat turn. History is included so follow-ups work. */
+function apiChat(question, history){
+  var turns = (history||[]).slice(-6).map(function(t){
+    return (t.role === 'user' ? 'USER: ' : 'YOU: ') + t.text;
+  }).join('\n');
+
+  var prompt =
+    CFG.CHAT_ROLE + '\n\n' +
+    'EVIDENCE\n' + chatEvidence() + '\n\n' +
+    (turns ? 'CONVERSATION SO FAR\n' + turns + '\n\n' : '') +
+    'USER QUESTION\n' + question + '\n\n' +
+    'OUTPUT — raw JSON only, no fences, no preamble:\n' +
+    '{"answer":string,"citations":[string],"judgement":string,"notInData":[string]}\n\n' +
+    'answer: the factual reply, 2-6 short sentences. Only what the evidence supports.\n' +
+    'citations: every figure you used, each as "[SOURCE-ID, field]: value". Empty if you asserted\n' +
+    '  no figures. Ids must come from EVIDENCE above — never invent one.\n' +
+    'judgement: how a value investor reads it, 1-4 sentences. May go beyond the figures but must\n' +
+    '  follow from them. Empty string if the question is purely factual.\n' +
+    'notInData: anything the question asked for that the evidence cannot answer. Empty if none.';
+
+  return fetch(CFG.AI + '?key=' + encodeURIComponent(AI_KEY), {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      contents:[{parts:[{text: prompt}]}],
+      generationConfig:{maxOutputTokens: 3000, responseMimeType:'application/json',
+                        temperature:0.3, thinkingConfig:{thinkingBudget:0}}
+    })
+  })
+  .catch(function(){ throw new ApiErr(netMsg('generativelanguage.googleapis.com'), 0); })
+  .then(function(r){
+    return r.json().catch(function(){ throw new ApiErr('Malformed response from the model.',0); })
+      .then(function(data){
+        if(!r.ok){
+          var msg = (data && data.error && data.error.message) ? data.error.message : ('HTTP ' + r.status);
+          if(r.status===429 && /limit:\s*0\b/.test(msg))
+            throw new ApiErr('That key has no Gemini quota (free-tier "limit: 0"). Create one via "Create API key in new project".', 429);
+          throw new ApiErr(msg, r.status);
+        }
+        var cand = data.candidates && data.candidates[0];
+        if(!cand) throw new ApiErr('The model returned nothing — possibly a safety filter.', 0);
+        var text = ((cand.content && cand.content.parts) || []).map(function(p){ return p.text||''; }).join('');
+        if(!text.trim()) throw new ApiErr('Empty response.', 0);
+        try { return parseLooseJson(text); }
+        catch(e){ throw new ApiErr('Could not parse the reply' +
+          (cand.finishReason==='MAX_TOKENS' ? ' — it was cut off. Try a narrower question.' : '.'), 0); }
       });
   });
 }
@@ -2472,6 +2691,79 @@ function viewOracle(m){
   '</div>';
 }
 
+/* ---- Buffett chat: floating, evidence-bound ---------------------------- */
+function viewChat(){
+  if(!State.chatOpen){
+    return '<button type="button" class="chat-fab" data-act="chatOpen" aria-label="Ask the analyst">' +
+      '<span class="chat-fab-i">&#9670;</span><span class="chat-fab-t">Ask</span></button>';
+  }
+
+  var msgs = State.chat || [];
+  var body;
+
+  if(!AI_KEY){
+    body = '<div class="chat-empty">' +
+      '<div class="chat-empty-h">Connect a model key</div>' +
+      '<div class="chat-empty-p">The analyst reads the figures on screen and answers from them. ' +
+      'It needs a free Google AI Studio key. Everything else in the app works without one.</div>' +
+      '<div class="row" style="margin-top:16px">' + btn('tabSettings','Open settings','primary') +
+      '<a class="chat-link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Get a key &#8599;</a></div>' +
+      '</div>';
+  } else if(!msgs.length){
+    var s = State.metrics ? State.ticker : 'this company';
+    body = '<div class="chat-empty">' +
+      '<div class="chat-empty-h">Ask about ' + esc(s) + '</div>' +
+      '<div class="chat-empty-p">Facts are cited to the data. Opinion is marked separately. ' +
+      'Anything the figures cannot answer, it says so.</div>' +
+      '<div class="chat-seeds">' +
+        ['Why did Valuation score what it did?',
+         'What is the margin of safety telling me?',
+         'How does this compare with its peers on debt?',
+         'What would make this a mistake?'].map(function(q){
+          return '<button type="button" class="chat-seed" data-act="chatAsk" data-q="'+attr(q)+'">'+esc(q)+'</button>';
+        }).join('') +
+      '</div></div>';
+  } else {
+    body = msgs.map(function(t){
+      if(t.role === 'user')
+        return '<div class="chat-u"><div class="chat-u-b">'+esc(t.text)+'</div></div>';
+      if(t.error)
+        return '<div class="chat-a"><div class="chat-err">'+esc(t.error)+'</div></div>';
+      var d = t.data || {};
+      var cites = asArr(d.citations).filter(function(c){ return String(c||'').trim(); });
+      var gaps  = asArr(d.notInData).filter(function(c){ return String(c||'').trim(); });
+      return '<div class="chat-a">' +
+        (d.answer ? '<div class="chat-txt">'+esc(d.answer)+'</div>' : '') +
+        (cites.length ? '<div class="chat-cites">' + cites.map(function(c){
+            return '<div>'+esc(typeof c==='string'?c:JSON.stringify(c))+'</div>'; }).join('') + '</div>' : '') +
+        (d.judgement ? '<div class="chat-j"><span class="chat-j-l">Judgement — not from the data</span>' +
+            esc(d.judgement) + '</div>' : '') +
+        (gaps.length ? '<div class="chat-gaps"><span class="chat-j-l">Not in the data</span>' +
+            '<ul>' + gaps.map(function(g){ return '<li>'+esc(g)+'</li>'; }).join('') + '</ul></div>' : '') +
+      '</div>';
+    }).join('');
+    if(State.chatBusy) body += '<div class="chat-a"><div class="chat-txt dim"><span class="spin"></span> reading the figures…</div></div>';
+  }
+
+  return '<div class="chat-panel">' +
+    '<div class="chat-head">' +
+      '<div><div class="chat-title">Analyst</div>' +
+      '<div class="chat-sub">' + (State.metrics ? esc(State.ticker) + ' · cites or declines' : 'no company loaded') + '</div></div>' +
+      '<div class="row" style="gap:4px">' +
+        (msgs.length ? '<button type="button" class="chat-x" data-act="chatClear" title="Clear">&#8635;</button>' : '') +
+        '<button type="button" class="chat-x" data-act="chatClose" aria-label="Close">&#10005;</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="chat-body" id="chat-body">' + body + '</div>' +
+    (AI_KEY ? '<div class="chat-foot">' +
+      '<input id="chat-in" type="text" data-draft="chat" data-enter="chatSend" autocomplete="off" ' +
+        'placeholder="Ask about the numbers on screen" value="'+attr(Draft.chat||'')+'"' +
+        (State.chatBusy?' disabled':'') + '>' +
+      '<button type="button" class="chat-send" data-act="chatSend"' + (State.chatBusy?' disabled':'') + '>&#8593;</button>' +
+    '</div>' : '') +
+  '</div>';
+}
+
 function viewHeader(){
   return '<header class="hdr"><div class="hdr-in">' +
     '<div class="logo"><span class="mk">S</span><b>stockterm</b></div>' +
@@ -3358,7 +3650,7 @@ function view(){
   return viewHeader() + '<main class="wrap">' + demoBar + body +
     '<div class="faint mono" style="font-size:9.5px;text-align:center;margin-top:20px;line-height:1.6">' +
     'Data: Finnhub. A modelling tool, not investment advice — nobody involved is a licensed advisor.<br>' +
-    'API keys are stored in this file; do not share it as-is.</div></main>';
+    'API keys are stored in this file; do not share it as-is.</div></main>' + viewChat();
 }
 
 /* ==========================================================================
@@ -3415,6 +3707,42 @@ function startLive(){
       if(!(a && (a.tagName==='INPUT' || a.tagName==='TEXTAREA'))) render();
     }
   }, CFG.LIVE_MS);
+}
+
+/* Keep the newest turn in view. Runs after the render that added it. */
+function scrollChat(){
+  window.setTimeout(function(){
+    var b = document.getElementById('chat-body');
+    if(b) b.scrollTop = b.scrollHeight;
+    var i = document.getElementById('chat-in');
+    if(i && !State.chatBusy){ try{ i.focus({preventScroll:true}); }catch(e){} }
+  }, 0);
+}
+
+function chatSend(q){
+  q = String(q||'').trim();
+  if(!q || State.chatBusy) return;
+  if(!AI_KEY){ State.chatOpen = true; render(); return; }
+
+  var history = State.chat.slice();
+  State.chat.push({role:'user', text:q});
+  Draft.chat = '';
+  State.chatBusy = true;
+  State.chatOpen = true;
+  render();
+  scrollChat();
+
+  apiChat(q, history.map(function(t){
+    return {role:t.role, text: t.role==='user' ? t.text : ((t.data&&t.data.answer)||'')};
+  })).then(function(data){
+    State.chat.push({role:'assistant', data:data});
+    State.chatBusy = false;
+    render(); scrollChat();
+  }).catch(function(err){
+    State.chat.push({role:'assistant', error:(err && err.message) || 'The request failed.'});
+    State.chatBusy = false;
+    render(); scrollChat();
+  });
 }
 
 function toast(msg){
@@ -3616,6 +3944,12 @@ var ACT = {
   },
 
   toggleAll: function(){ State.showAll = !State.showAll; set({}); },
+
+  chatOpen:  function(){ State.chatOpen = true;  render(); scrollChat(); },
+  chatClose: function(){ State.chatOpen = false; render(); },
+  chatClear: function(){ State.chat = []; Draft.chat = ''; render(); },
+  chatAsk:   function(el){ chatSend(el.getAttribute('data-q')); },
+  chatSend:  function(){ chatSend(Draft.chat); },
   sort: function(el){ State.sort = el.getAttribute('data-sort'); render(); },
   bandFilter: function(el){ State.bandFilter = el.getAttribute('data-band')||''; render(); },
   demo: function(){ State.wantSetup = false; loadDemo(); },
