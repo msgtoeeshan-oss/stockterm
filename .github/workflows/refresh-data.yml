@@ -1,0 +1,92 @@
+name: refresh-data
+
+# Keeps the bundled figures current so visitors without a key never see stale
+# numbers. Runs after the US close on weekdays, and on demand.
+#
+# Requires one repository secret: FINNHUB_KEY
+#   Settings > Secrets and variables > Actions > New repository secret
+#
+# The secret is not readable from the repo, is masked in logs, and the build
+# script refuses to write the file if the key ever appears in the output.
+
+on:
+  schedule:
+    # 22:10 UTC Mon-Fri — after the 20:00/21:00 UTC US close, allowing for DST
+    - cron: '10 22 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-data
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check the key is configured
+        env:
+          FINNHUB_KEY: ${{ secrets.FINNHUB_KEY }}
+        run: |
+          if [ -z "$FINNHUB_KEY" ]; then
+            echo "::error::Repository secret FINNHUB_KEY is not set."
+            echo "Add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          echo "key present"
+
+      - name: Rebuild the bundled snapshots
+        env:
+          FINNHUB_KEY: ${{ secrets.FINNHUB_KEY }}
+        run: node tools/build-bundle.js
+
+      - name: Verify no key leaked into the output
+        env:
+          FINNHUB_KEY: ${{ secrets.FINNHUB_KEY }}
+        run: |
+          if grep -qF "$FINNHUB_KEY" stock.html index.html; then
+            echo "::error::The API key appears in the output. Aborting."
+            exit 1
+          fi
+          if grep -nE "var (FINNHUB_KEY|AI_KEY)[[:space:]]*=[[:space:]]*['\"][^'\"]+['\"]" stock.html; then
+            echo "::error::A key constant is non-empty."
+            exit 1
+          fi
+          echo "clean"
+
+      - name: Verify the app still parses
+        run: |
+          node -e "
+            const fs=require('fs'), vm=require('vm');
+            const h=fs.readFileSync('stock.html','utf8');
+            const a=h.indexOf('<script>'), b=h.lastIndexOf('</'+'script>');
+            new vm.Script(h.slice(a+8,b), {filename:'stock.js'});
+            const m=h.match(/^ {2}DEMO: (\{[\s\S]*?\}),$/m);
+            if(!m) { console.error('no DEMO block'); process.exit(1); }
+            const d=JSON.parse(m[1]);
+            const n=Object.keys(d.set||{}).length;
+            if(n < 10) { console.error('only '+n+' companies bundled'); process.exit(1); }
+            console.log('parses, '+n+' companies, asOf '+d.asOf);
+          "
+
+      - name: Commit if anything changed
+        run: |
+          if git diff --quiet -- stock.html index.html; then
+            echo "figures unchanged — nothing to commit"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add stock.html index.html
+          git commit -m "Refresh bundled market data
+
+          Automated by .github/workflows/refresh-data.yml"
+          git push
