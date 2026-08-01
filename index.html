@@ -6,7 +6,7 @@
 <meta name="referrer" content="no-referrer">
 <title>Stock Research Terminal — free, in your browser, cites every source</title>
 <meta name="description" content="A stock research terminal in a single HTML file. Scores companies against rules you control, shows the full audit trace behind every point, runs a DCF, and cites every claim back to the filing it came from.">
-<meta name="author" content="stockterm">
+<meta name="author" content="Stock Research Terminal">
 <meta name="theme-color" content="#0a0813">
 
 <!-- Google Search Console ownership proof. Public by design, not a secret.
@@ -73,7 +73,8 @@ p{margin:0 0 7px}
 .logo{display:flex;align-items:center;gap:9px;white-space:nowrap}
 .logo .mk{width:30px;height:30px;border-radius:9px;background:var(--grad);display:flex;
   align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#000;flex:none}
-.logo b{font-size:17px;font-weight:700;letter-spacing:-.02em;color:var(--text);font-family:var(--sans)}
+.logo b{font-size:16px;font-weight:700;letter-spacing:-.025em;color:var(--text);font-family:var(--sans);white-space:nowrap}
+.logo b i{font-style:normal;font-weight:500;color:var(--dim)}
 .logo em{display:none}
 .search{flex:1;min-width:180px;max-width:340px;position:relative}
 /* must out-specify the global input[type=text] rule further down the sheet */
@@ -2546,7 +2547,7 @@ function viewSetup(){
   var v = State.verify;
   return '<div class="setup">' +
     '<div class="logo" style="justify-content:center;margin-bottom:20px">' +
-      '<span class="mk">S</span><b>stockterm</b></div>' +
+      '<span class="mk">S</span><b>Stock Research <i>Terminal</i></b></div>' +
     '<div class="setup-card">' +
       '<h2 style="font-size:20px;letter-spacing:-.02em;margin-bottom:6px">Connect your data</h2>' +
       '<div class="prose" style="color:var(--dim)">stockterm runs entirely in your browser. ' +
@@ -2892,7 +2893,7 @@ function viewChat(){
 
 function viewHeader(){
   return '<header class="hdr"><div class="hdr-in">' +
-    '<div class="logo"><span class="mk">S</span><b>stockterm</b></div>' +
+    '<div class="logo"><span class="mk">S</span><b>Stock Research <i>Terminal</i></b></div>' +
     '<div class="search">' +
       '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6d747f" stroke-width="2.4" aria-hidden="true">' +
       '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>' +
