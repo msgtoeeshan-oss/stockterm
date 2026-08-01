@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://msgtoeeshan-oss.github.io/stock-research-terminal/sitemap.xml

@@ -15,7 +15,7 @@
 #>
 param(
     [Parameter(Mandatory = $true)][string]$User,
-    [string]$Repo = 'stockterm'
+    [string]$Repo = 'stock-research-terminal'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -46,8 +46,8 @@ foreach ($f in $targets) {
     $t = Read-Text $f
     $before = $t
     $t = $t.Replace('SITE_URL', $site)
-    $t = $t.Replace('YOUR-USERNAME/stockterm', "$User/$Repo")
-    $t = $t.Replace('YOUR-USERNAME.github.io/stockterm', "$User.github.io/$Repo")
+    $t = $t.Replace('YOUR-USERNAME/stock-research-terminal', "$User/$Repo")
+    $t = $t.Replace('YOUR-USERNAME.github.io/stock-research-terminal', "$User.github.io/$Repo")
     $t = $t.Replace('YOUR-USERNAME', $User)
     $t = $t.Replace('REPO-NAME', $Repo)
     if ($t -ne $before) {

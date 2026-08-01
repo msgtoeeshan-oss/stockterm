@@ -1,10 +1,10 @@
-# stockterm
+# Stock Research Terminal
 
 **A stock research terminal in a single HTML file.** No install, no server, no build step, no dependencies. Open it and it works.
 
 It scores a company against rules you control, shows the full audit trace behind every point, runs a DCF you can push around with sliders, and writes a sourced research memo where every claim cites the filing it came from.
 
-**[▶ Open the live demo](https://msgtoeeshan-oss.github.io/stockterm/)** — real data, nothing to sign up for.
+**[▶ Open the live demo](https://msgtoeeshan-oss.github.io/stock-research-terminal/)** — real data, nothing to sign up for.
 
 ![The Analysis tab](docs/screenshot-analysis.png)
 
@@ -163,7 +163,7 @@ The whole app is one static file, so GitHub Pages serves it free with no build s
 1. Push this repo to GitHub as **Public**
 2. **Settings → Pages → Source: Deploy from a branch**
 3. Branch **`main`**, folder **`/ (root)`** → **Save**
-4. Wait a minute — your link is `https://msgtoeeshan-oss.github.io/stockterm/`
+4. Wait a minute — your link is `https://msgtoeeshan-oss.github.io/stock-research-terminal/`
 
 `index.html` is a copy of `stock.html`; that's what makes the bare URL resolve. After editing the app:
 
