@@ -583,6 +583,18 @@ var CFG = {
      2.5-flash serves fine. Change AI_MODEL if that ever flips. */
   AI_MODEL: 'gemini-2.5-flash',
   AI: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+
+  /* ---- Optional: make the analyst work with NO key from the visitor -------
+     Point this at your own Cloudflare Worker (see worker/README.md) and the
+     key lives on the server, never in this file. Visitors get the analyst
+     with nothing to sign up for.
+
+       AI_PROXY: 'https://stockterm-ai.YOUR-SUBDOMAIN.workers.dev'
+
+     Leave it empty and the app falls back to asking each visitor for their
+     own key. NEVER put a Gemini key in AI_KEY in a public file — a scraped
+     key bills YOU for every stranger's usage, with no ceiling.            */
+  AI_PROXY: '',
   /* 8 answers, each carrying verbatim filing quotes, overrun anything smaller.
      Measured: a Munger memo against a full 10-K truncates at 6000. */
   AI_MAX_TOKENS: 16000,
@@ -1061,6 +1073,16 @@ function restore(){
   if(h) State.tab = h;                 // an explicit #hash beats the saved tab
   Draft.ticker = State.ticker;
 }
+/* The analyst is available if EITHER a server-side proxy is configured or the
+   visitor supplied their own key. Proxy wins: it needs nothing from them. */
+function aiReady(){ return !!(CFG.AI_PROXY || AI_KEY); }
+function aiViaProxy(){ return !!CFG.AI_PROXY; }
+function aiUrl(){
+  return CFG.AI_PROXY
+    ? CFG.AI_PROXY.replace(/\/+$/,'') + '/generate'
+    : CFG.AI + '?key=' + encodeURIComponent(AI_KEY);
+}
+
 function persistKeys(){
   Store.set(CFG.LS_KEYS, JSON.stringify({finnhub:FINNHUB_KEY, ai:AI_KEY}));
 }
@@ -1263,7 +1285,7 @@ function apiJudge(evidence, bull, bear){
     'unresolvable: disagreements the evidence cannot settle either way.\n' +
     'evidenceQuality: one sentence on whether this pack is strong enough to decide anything.';
 
-  return fetch(CFG.AI + '?key=' + encodeURIComponent(AI_KEY), {
+  return fetch(aiUrl(), {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({
       contents:[{parts:[{text: prompt}]}],
@@ -1421,7 +1443,7 @@ function apiChat(question, history){
   var payload = {contents:[{parts:[{text: prompt}]}], generationConfig: gen};
   if(search) payload.tools = [{google_search:{}}];
 
-  return fetch(CFG.AI + '?key=' + encodeURIComponent(AI_KEY), {
+  return fetch(aiUrl(), {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify(payload)
   })
@@ -1828,7 +1850,7 @@ function apiThesis(evidence){
     'Set notFound true for any question SOURCES cannot answer, and say so in the answer text.\n' +
     'recencyNote: the most recent fiscal year you used, and a flag if you had to fall back to older data.';
 
-  return fetch(CFG.AI + '?key=' + encodeURIComponent(AI_KEY), {
+  return fetch(aiUrl(), {
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify({
@@ -2778,9 +2800,9 @@ function viewChat(){
   var msgs = State.chat || [];
   var body;
 
-  if(!AI_KEY){
+  if(!aiReady()){
     body = '<div class="chat-empty">' +
-      '<div class="chat-empty-h">Connect a model key</div>' +
+      '<div class="chat-empty-h">Turn on the analyst</div>' +
       '<div class="chat-empty-p">The analyst reads the figures on screen and answers from them. ' +
       'It needs a free Google AI Studio key. Everything else in the app works without one.</div>' +
       '<div class="row" style="margin-top:16px">' + btn('tabSettings','Open settings','primary') +
@@ -3406,7 +3428,7 @@ function renderJudge(j){
 function viewThesis(m){
   var localPart = viewLocalAssessment(m);
 
-  if(!AI_KEY){
+  if(!aiReady()){
     return localPart + panel('Model thesis — optional',
       note('No model key set',
         '<div class="prose">This section additionally sends the computed metrics to ' + esc(CFG.AI_LABEL) + '. ' +
@@ -3822,7 +3844,7 @@ function scrollChat(){
 function chatSend(q){
   q = String(q||'').trim();
   if(!q || State.chatBusy) return;
-  if(!AI_KEY){ State.chatOpen = true; render(); return; }
+  if(!aiReady()){ State.chatOpen = true; render(); return; }
 
   var history = State.chat.slice();
   State.chat.push({role:'user', text:q});
@@ -4066,7 +4088,7 @@ var ACT = {
   debate: function(){
     var m = State.metrics;
     if(!m){ toast('load a ticker first'); return; }
-    if(!AI_KEY){ set({tab:'settings'}); return; }
+    if(!aiReady()){ set({tab:'settings'}); return; }
 
     var evidence = buildEvidence(m);
     State.evidence = evidence;
@@ -4157,7 +4179,7 @@ var ACT = {
   thesis: function(){
     var m = State.metrics;
     if(!m){ toast('load a ticker first'); return; }
-    if(!AI_KEY){ set({tab:'settings'}); return; }
+    if(!aiReady()){ set({tab:'settings'}); return; }
 
     var evidence = buildEvidence(m);
     State.evidence = evidence;

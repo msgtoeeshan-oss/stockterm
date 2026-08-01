@@ -30,6 +30,44 @@ Optionally add a [Google AI Studio](https://aistudio.google.com/apikey) key in *
 
 ---
 
+## Sharing it without making anyone paste a key
+
+There are three ways to run this, depending on who it's for.
+
+| | Who it suits | Users must | Costs you |
+|---|---|---|---|
+| **Public link** | anyone | paste their own free key for tickers outside the bundle | nothing |
+| **Private build** | a handful of people you know | nothing at all | nothing |
+| **Proxy** | a public audience you want to fully serve | nothing at all | your Gemini usage |
+
+### Private build — simplest for a small group
+
+Bakes your keys into one file you send directly. Recipients open it and everything works: every ticker, live prices, the analyst. No setup screen, no pasting.
+
+```powershell
+.\tools\build-private.ps1 -Finnhub "your_key" -Gemini "your_key"
+```
+
+It verifies both keys against the live APIs before baking them, writes `stock.local.html`, then confirms git is ignoring it and that the public `stock.html` is still key-free.
+
+Send that file however you'd send any private document. **Anyone who receives it receives the keys** — a fair trade for a small trusted group, and the reason `*.local.html` is in `.gitignore`. Re-run it after any change to `stock.html`.
+
+### Proxy — for a public audience
+
+If you want the *public link* to include the analyst with no signup, a Cloudflare Worker holds your Gemini key server-side. See [`worker/README.md`](worker/README.md). Set one line in section 1:
+
+```js
+AI_PROXY: 'https://stockterm-ai.your-subdomain.workers.dev',
+```
+
+Free on Cloudflare at any realistic volume; the Gemini usage becomes yours (roughly 1–3¢ per analysis). The Worker caps requests per IP per day and refuses origins other than your site.
+
+### What is never an option
+
+**Putting a key in `stock.html` and pushing it.** The file is downloaded by the browser, so anything in it is readable with F12 — there is no way to hide a key in client-side code. Bots scan public repos for keys within minutes of a push. For Finnhub that means a rate-limited, broken app; for Gemini on a billed project it means uncapped charges to you. CI fails the build if a key ever appears in a tracked file.
+
+---
+
 ## What it does
 
 ### Analysis — the landing tab
