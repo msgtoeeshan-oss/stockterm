@@ -196,6 +196,19 @@ input:focus{border-color:var(--accent);outline:none}
 .qlist{margin:10px 0 0;padding-left:20px;color:var(--faint);font-size:12px;line-height:1.65}
 .qlist li{margin-bottom:2px}
 
+.tbl.screen th.sortable{cursor:pointer;user-select:none}
+.tbl.screen th.sortable:hover{color:var(--text)}
+.tbl.screen th.sortable.on{color:var(--violet)}
+.tbl.screen .caret{font-size:9px}
+.tbl.screen tr.rowlink{cursor:pointer}
+.tbl.screen tr.cur{background:rgba(139,124,246,.10)}
+.scorepill{display:inline-block;min-width:38px;text-align:center;font-family:var(--mono);
+  font-size:13px;font-weight:700;padding:3px 8px;border-radius:var(--r-pill);
+  background:var(--panel-2);border:1px solid var(--line-2);color:var(--dim)}
+.scorepill.pos{color:#04231a;background:var(--pos);border-color:var(--pos)}
+.scorepill.warn{color:#291c02;background:var(--warn);border-color:var(--warn)}
+.scorepill.neg{color:#2a0910;background:var(--neg);border-color:var(--neg)}
+
 .symchips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
 .symchip{font-family:var(--mono);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:var(--r-pill);
   background:var(--panel-2);border:1px solid var(--line);color:var(--dim)}
@@ -410,6 +423,7 @@ var CFG = {
   /* Analysis leads — it is the point of the app. Overview is reference data. */
   TABS: [
     {id:'thesis',    label:'Analysis'},
+    {id:'screen',    label:'Screen'},
     {id:'overview',  label:'Overview'},
     {id:'valuation', label:'Valuation'},
     {id:'signal',    label:'Rule trace'},
@@ -767,6 +781,8 @@ var State = {
   wantSetup: false,
   notBundled:'',
   suggest:   [],
+  sort:      'score',
+  bandFilter:'',
   deb:       {status:'idle', bull:null, bear:null, judge:null, error:'', at:''},
   docs:      [],      /* uploaded filings — memory only, never persisted */
   docWarn:   [],
@@ -1161,6 +1177,43 @@ function suggestSymbols(input, max){
   return out;
 }
 
+/* Rebuild the parsed-annual shape from a bundled entry. Shared by the loader
+   and the screener so both see identical figures. */
+function annualsFrom(rows){
+  return (rows||[]).map(function(y){
+    var cfo = num(y.cfo), capex = num(y.capex), rev = num(y.revenue);
+    var gp = num(y.grossProfit), oi = num(y.opIncome), ni = num(y.netIncome);
+    return {
+      year:String(y.year), revenue:rev, grossProfit:gp, opIncome:oi, netIncome:ni,
+      eps:num(y.eps), cfo:cfo, capex:capex,
+      fcf:(cfo!==null && capex!==null) ? cfo-Math.abs(capex) : null,
+      grossMargin:(gp!==null&&rev)?gp/rev*100:null,
+      opMargin:(oi!==null&&rev)?oi/rev*100:null,
+      netMargin:(ni!==null&&rev)?ni/rev*100:null
+    };
+  });
+}
+
+/* Score every bundled company with the user's current weights. Cheap enough
+   to run on each render: 51 companies of pure arithmetic. */
+function screenAll(){
+  var out = [];
+  demoSymbols().forEach(function(sym){
+    var e = CFG.DEMO.set[sym];
+    if(!e) return;
+    var m = computeMetrics({quote:e.quote, profile:e.profile, metric:e.metric,
+                            annuals:annualsFrom(e.annuals)});
+    var sig = runSignal(m, State.weights);
+    var f = {};
+    sig.factors.forEach(function(x){ f[x.id] = x.included ? x.score : null; });
+    out.push({
+      sym:sym, name:(e.profile&&e.profile.name)||sym, m:m, sig:sig, f:f,
+      score:sig.composite, band:sig.band, coverage:sig.coverage
+    });
+  });
+  return out;
+}
+
 function demoSymbols(){
   return (CFG.DEMO && CFG.DEMO.set) ? Object.keys(CFG.DEMO.set) : [];
 }
@@ -1420,8 +1473,12 @@ function apiThesis(evidence){
 /* ==========================================================================
    5  METRICS
    ========================================================================== */
-function computeMetrics(){
-  var q = State.quote || {}, p = State.profile || {}, k = State.metric || {}, a = State.annuals || [];
+/* Reads from State by default, or from an explicit {quote,profile,metric,
+   annuals} bundle so a whole set of companies can be scored without
+   disturbing the one on screen. */
+function computeMetrics(src){
+  src = src || State;
+  var q = src.quote || {}, p = src.profile || {}, k = src.metric || {}, a = src.annuals || [];
   var m = {};
 
   m.currency = p.currency || 'USD';
@@ -2038,6 +2095,80 @@ function viewSetup(){
     '</div>' +
     '<div class="faint" style="font-size:11px;text-align:center;margin-top:16px">' +
     'A modelling tool, not investment advice. Nobody involved is a licensed advisor.</div></div>';
+}
+
+/* ---- SCREEN: every bundled company ranked by the same rules ---- */
+function viewScreen(){
+  var rows = screenAll();
+  if(!rows.length) return panel('Screen',
+    '<div class="prose">Screening ranks the bundled companies against your rules. ' +
+    'This build has no bundled set, so there is nothing to rank.</div>');
+
+  var SORTS = {
+    score:  function(a,b){ return (b.score===null?-1:b.score) - (a.score===null?-1:a.score); },
+    sym:    function(a,b){ return a.sym < b.sym ? -1 : 1; },
+    pe:     function(a,b){ return (a.m.pe===null?1e9:a.m.pe) - (b.m.pe===null?1e9:b.m.pe); },
+    fcfy:   function(a,b){ return (b.m.fcfYield===null?-1e9:b.m.fcfYield) - (a.m.fcfYield===null?-1e9:a.m.fcfYield); },
+    growth: function(a,b){ return (b.m.revGrowth===null?-1e9:b.m.revGrowth) - (a.m.revGrowth===null?-1e9:a.m.revGrowth); },
+    margin: function(a,b){ return (b.m.opMargin===null?-1e9:b.m.opMargin) - (a.m.opMargin===null?-1e9:a.m.opMargin); },
+    roe:    function(a,b){ return (b.m.roe===null?-1e9:b.m.roe) - (a.m.roe===null?-1e9:a.m.roe); },
+    cap:    function(a,b){ return (b.m.marketCap||0) - (a.m.marketCap||0); }
+  };
+  var key = SORTS[State.sort] ? State.sort : 'score';
+  rows.sort(SORTS[key]);
+
+  var band = State.bandFilter || '';
+  var shown = band ? rows.filter(function(r){ return r.band && r.band.label === band; }) : rows;
+
+  var counts = {};
+  rows.forEach(function(r){ var l = r.band?r.band.label:'—'; counts[l] = (counts[l]||0)+1; });
+
+  var th = function(id, label, cls){
+    return '<th class="' + (cls||'') + ' sortable' + (key===id?' on':'') + '" ' +
+      'data-act="sort" data-sort="' + attr(id) + '">' + esc(label) +
+      (key===id ? ' <span class="caret">▾</span>' : '') + '</th>';
+  };
+
+  var body = shown.map(function(r){
+    var s = r.score;
+    var cl = s===null ? 'faint' : (s>=72?'pos':(s>=52?'warn':(s>=34?'':'neg')));
+    return '<tr data-act="chip" data-sym="' + attr(r.sym) + '" class="rowlink' +
+        (r.sym===State.ticker?' cur':'') + '">' +
+      '<td><a class="tk" href="#">' + esc(r.sym) + '</a>' +
+        '<div class="faint" style="font-size:10.5px;font-family:var(--sans)">' + esc(r.name) + '</div></td>' +
+      '<td class="n"><span class="scorepill ' + cl + '">' + esc(s===null?'--':s.toFixed(0)) + '</span></td>' +
+      '<td>' + (r.band ? tag(r.band.label, r.band.cls) : '') + '</td>' +
+      '<td class="n">' + esc(r.m.pe===null?'--':fx(r.m.pe,1)) + '</td>' +
+      '<td class="n ' + cls(r.m.fcfYield) + '">' + esc(pct(r.m.fcfYield,1)) + '</td>' +
+      '<td class="n ' + cls(r.m.revGrowth) + '">' + esc(pctS(r.m.revGrowth,1)) + '</td>' +
+      '<td class="n">' + esc(pct(r.m.opMargin,1)) + '</td>' +
+      '<td class="n">' + esc(pct(r.m.roe,0)) + '</td>' +
+      '<td class="n dim">' + esc(money(r.m.marketCap)) + '</td>' +
+      '<td class="n faint">' + esc(fx(r.coverage,0)) + '%</td>' +
+    '</tr>';
+  }).join('');
+
+  var chips = ['','ACCUMULATE','HOLD','TRIM','AVOID'].map(function(b){
+    var n = b ? (counts[b]||0) : rows.length;
+    return '<button type="button" class="symchip' + (band===b?' on':'') + '" ' +
+      'data-act="bandFilter" data-band="' + attr(b) + '">' +
+      esc(b || 'All') + ' <span class="dim">' + n + '</span></button>';
+  }).join('');
+
+  return panelT('Screen — ' + rows.length + ' companies, your rules',
+      '<div style="padding:0 18px 12px"><div class="symchips">' + chips + '</div></div>' +
+      '<div class="scroll"><table class="tbl screen"><thead><tr>' +
+        th('sym','Company') + th('score','Score','n') + '<th>Band</th>' +
+        th('pe','P/E','n') + th('fcfy','FCF yield','n') + th('growth','Sales growth','n') +
+        th('margin','Op margin','n') + th('roe','ROE','n') + th('cap','Size','n') +
+        '<th class="n">Data</th>' +
+      '</tr></thead><tbody>' + body + '</tbody></table></div>',
+      '<span class="faint mono" style="font-size:11px">click a row to open it</span>') +
+    note('What this is',
+      '<div class="prose">Every company scored by the <b>same rules you set</b> on the Rule trace tab — ' +
+      'change a weight there and this reorders. Sorting by score is not a ranking of quality; it ranks ' +
+      'how well each company fits <i>your</i> criteria, and the Data column shows how much of the input ' +
+      'was actually present. Open any row to see the full trace behind its number.</div>', '');
 }
 
 function viewHeader(){
@@ -2877,7 +3008,8 @@ function view(){
       '<div class="mono dim" style="padding:20px;text-align:center">Enter a ticker and select ANALYZE.</div>');
   } else {
     var m = State.metrics;
-    body = State.tab==='overview'  ? viewOverview(m)
+    body = State.tab==='screen'    ? viewScreen()
+         : State.tab==='overview'  ? viewOverview(m)
          : State.tab==='signal'    ? viewSignal(m)
          : State.tab==='valuation' ? viewValuation(m)
          : State.tab==='thesis'    ? viewThesis(m)
@@ -3182,6 +3314,8 @@ var ACT = {
   },
 
   toggleAll: function(){ State.showAll = !State.showAll; set({}); },
+  sort: function(el){ State.sort = el.getAttribute('data-sort'); render(); },
+  bandFilter: function(el){ State.bandFilter = el.getAttribute('data-band')||''; render(); },
   demo: function(){ State.wantSetup = false; loadDemo(); },
   wantSetup: function(){ State.wantSetup = true; render(); },
   cancelSetup: function(){ State.wantSetup = false; render(); },
