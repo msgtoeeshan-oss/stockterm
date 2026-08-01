@@ -348,6 +348,98 @@ input[type=range]::-moz-range-thumb{width:17px;height:17px;border:0;border-radiu
   border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-1px}
 @keyframes sp{to{transform:rotate(360deg)}}
 
+/* ── ORACLE: Igloo monochrome. Scoped to .iglo so the rest of the app is
+      untouched. 8px spacing scale, system stack, black/white only. ───────── */
+.iglo{--k:#000;--w:#fff;--g:#8a8a8a;--ln:#000;
+  background:var(--w);color:var(--k);margin:16px 0;border:1px solid var(--ln);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-feature-settings:"tnum";letter-spacing:-.011em}
+.iglo *{box-sizing:border-box}
+
+.ig-hero{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;
+  flex-wrap:wrap;padding:32px;border-bottom:1px solid var(--ln)}
+.ig-eyebrow{font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--g);margin-bottom:16px}
+.ig-verdict{font-size:40px;line-height:1.04;font-weight:700;letter-spacing:-.035em;max-width:15ch}
+.ig-sub{font-size:14px;line-height:1.5;color:var(--g);margin-top:16px;max-width:44ch}
+.ig-hero-r{display:flex;flex-direction:column;align-items:flex-end;gap:16px}
+.ig-badge{background:var(--k);color:var(--w);font-size:13px;font-weight:700;
+  letter-spacing:.08em;padding:8px 16px}
+.ig-conf{display:flex;align-items:baseline;gap:8px;border:1px solid var(--ln);padding:8px 16px}
+.ig-conf-n{font-size:24px;font-weight:700;letter-spacing:-.03em}
+.ig-conf-u{font-size:11px;color:var(--g);letter-spacing:.06em;text-transform:uppercase}
+.ig-pulse{width:8px;height:8px;background:var(--k);border-radius:50%;
+  align-self:center;animation:igp 2.4s ease-in-out infinite}
+@keyframes igp{0%,100%{opacity:1}50%{opacity:.15}}
+
+.ig-gates{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  border-bottom:1px solid var(--ln)}
+.ig-gate{padding:24px 16px;border-right:1px solid var(--ln)}
+.ig-gate:last-child{border-right:0}
+.ig-gate-m{font-size:16px;line-height:1;margin-bottom:16px}
+.ig-gate.fail .ig-gate-m,.ig-gate.unknown .ig-gate-m{color:var(--g)}
+.ig-gate-l{font-size:13px;font-weight:600}
+.ig-gate-t{font-size:11px;color:var(--g);margin-top:8px;letter-spacing:.04em}
+.ig-gate-v{font-size:20px;font-weight:700;letter-spacing:-.03em;margin-top:8px}
+.ig-gate.unknown .ig-gate-v{color:var(--g);font-size:13px;font-weight:500}
+
+.ig-grid{display:grid;grid-template-columns:1fr;border-bottom:1px solid var(--ln)}
+@media(min-width:900px){.ig-grid{grid-template-columns:repeat(3,1fr)}}
+.ig-cell{padding:32px;border-right:1px solid var(--ln);border-bottom:1px solid var(--ln)}
+.ig-cell:last-child{border-right:0}
+@media(min-width:900px){.ig-cell{border-bottom:0}}
+.ig-h{font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--g)}
+.ig-k{font-size:32px;font-weight:700;letter-spacing:-.035em;margin-top:16px;line-height:1}
+.ig-kl{font-size:11px;color:var(--g);margin-top:8px;line-height:1.45}
+.ig-rows{margin-top:24px;border-top:1px solid var(--ln)}
+.ig-rows>div{display:flex;justify-content:space-between;align-items:baseline;gap:16px;
+  padding:8px 0;border-bottom:1px solid #e4e4e4;font-size:13px}
+.ig-rows>div:last-child{border-bottom:0}
+.ig-rows span{color:var(--g)}
+.ig-rows b{font-weight:700;letter-spacing:-.02em}
+.ig-rows .ig-strong{border-top:1px solid var(--ln);margin-top:8px;padding-top:16px;font-size:15px}
+.ig-rows .ig-strong span{color:var(--k);font-weight:600}
+.ig-note{font-size:11px;line-height:1.55;color:var(--g);margin-top:24px}
+
+.ig-scen{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--ln)}
+.ig-sc{padding:24px 16px;border-right:1px solid var(--ln)}
+.ig-sc:last-child{border-right:0}
+.ig-sc.base{background:var(--k);color:var(--w)}
+.ig-sc-h{font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--g)}
+.ig-sc.base .ig-sc-h{color:rgba(255,255,255,.62)}
+.ig-sc-v{font-size:28px;font-weight:700;letter-spacing:-.035em;margin-top:16px;line-height:1}
+.ig-sc-m{font-size:12px;margin-top:8px;color:var(--g)}
+.ig-sc.base .ig-sc-m{color:rgba(255,255,255,.78)}
+.ig-sc-a{font-size:10.5px;margin-top:16px;color:var(--g);line-height:1.5}
+.ig-sc.base .ig-sc-a{color:rgba(255,255,255,.55)}
+
+.ig-drawer{border-bottom:1px solid var(--ln)}
+.ig-drawer summary{padding:24px 32px;cursor:pointer;font-size:11px;font-weight:600;
+  letter-spacing:.16em;text-transform:uppercase;list-style:none;display:flex;
+  align-items:center;justify-content:space-between}
+.ig-drawer summary::-webkit-details-marker{display:none}
+.ig-drawer summary::after{content:"+";font-size:18px;font-weight:400}
+.ig-drawer[open] summary::after{content:"–"}
+.ig-drawer summary:hover{background:#f2f2f2}
+.ig-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.ig-tbl td{padding:8px 32px;border-top:1px solid #e4e4e4}
+.ig-tbl td:first-child{color:var(--g);width:40%}
+.ig-tbl td:last-child{font-weight:600;text-align:right}
+
+.ig-maxim{padding:32px;font-size:20px;font-weight:600;letter-spacing:-.025em;
+  border-bottom:1px solid var(--ln);line-height:1.35}
+.ig-maxim span{display:block;font-size:13px;font-weight:400;color:var(--g);
+  margin-top:16px;letter-spacing:-.005em;line-height:1.55;max-width:70ch}
+.ig-foot{padding:16px 32px;font-size:10.5px;color:var(--g);letter-spacing:.02em}
+
+@media(prefers-reduced-motion:reduce){.ig-pulse{animation:none}}
+@media(max-width:640px){
+  .ig-hero,.ig-cell,.ig-maxim{padding:24px 16px}
+  .ig-verdict{font-size:28px}
+  .ig-drawer summary,.ig-tbl td,.ig-foot{padding-left:16px;padding-right:16px}
+  .ig-scen{grid-template-columns:1fr}
+  .ig-sc{border-right:0;border-bottom:1px solid var(--ln)}
+}
+
 @media(max-width:640px){
   .wrap{padding:6px 6px 40px}
   .q-px{font-size:25px}
@@ -422,6 +514,7 @@ var CFG = {
 
   /* Analysis leads — it is the point of the app. Overview is reference data. */
   TABS: [
+    {id:'oracle',    label:'Oracle'},
     {id:'thesis',    label:'Analysis'},
     {id:'screen',    label:'Screen'},
     {id:'overview',  label:'Overview'},
@@ -543,6 +636,21 @@ var CFG = {
     '  - If both sides ignored something material that IS in SOURCES, say so.\n' +
     '  - Where the evidence genuinely cannot settle a disagreement, say that rather than guessing.\n' +
     '  - You may not introduce facts of your own. The same sourcing rules bind you.\n',
+
+  /* Quantitative pre-screen. Fixed thresholds, deliberately unweighted: a
+     company either clears the bar or it does not. */
+  BUFFETT: [
+    {id:'cagr',   label:'Revenue CAGR',      test:'> 15%',   need:'revenueCagr', pass:function(m){return m.revenueCagr>15},
+     show:function(m){return pctS(m.revenueCagr,1)}},
+    {id:'eps',    label:'EPS growth',        test:'> 15%',   need:'epsGrowth',   pass:function(m){return m.epsGrowth>15},
+     show:function(m){return pctS(m.epsGrowth,1)}},
+    {id:'roe',    label:'Return on equity',  test:'> 15%',   need:'roe',         pass:function(m){return m.roe>15},
+     show:function(m){return pct(m.roe,1)}},
+    {id:'margin', label:'Net margin',        test:'> 20%',   need:'netMargin',   pass:function(m){return m.netMargin>20},
+     show:function(m){return pct(m.netMargin,1)}},
+    {id:'debt',   label:'Debt / equity',     test:'< 0.5',   need:'de',          pass:function(m){return m.de<0.5},
+     show:function(m){return fx(m.de,2)+'x'}}
+  ],
 
   DEF_WEIGHTS: {valuation:25, growth:25, quality:25, balance:25},
   DEF_DCF:     {growth:8, fade:10, terminal:2.5, discount:9},
@@ -1790,6 +1898,56 @@ function runDcf(m, a){
   };
 }
 
+/* ---- Buffett pre-screen ------------------------------------------------
+   Five fixed gates. A gate whose input is missing is "unknown", never a
+   pass — the count of unknowns is reported alongside the result. */
+function buffettScreen(m){
+  var rows = CFG.BUFFETT.map(function(g){
+    if(!has(m, g.need)) return {id:g.id, label:g.label, test:g.test, status:'unknown', value:'no data'};
+    var p = false;
+    try { p = !!g.pass(m); } catch(e){ p = false; }
+    var v; try { v = g.show(m); } catch(e){ v = '--'; }
+    return {id:g.id, label:g.label, test:g.test, status:p?'pass':'fail', value:v};
+  });
+  var pass = rows.filter(function(r){ return r.status==='pass'; }).length;
+  var fail = rows.filter(function(r){ return r.status==='fail'; }).length;
+  var unk  = rows.filter(function(r){ return r.status==='unknown'; }).length;
+  return {rows:rows, pass:pass, fail:fail, unknown:unk, total:rows.length};
+}
+
+/* Cash generated less all capital spending. Buffett's owner earnings deducts
+   MAINTENANCE capex only — filings do not separate it from growth capex, so
+   this is the conservative full-capex figure and is labelled as such. */
+function ownerEarnings(m){
+  var yrs = (m.years||[]).filter(function(y){ return num(y.cfo)!==null && num(y.capex)!==null; });
+  if(!yrs.length) return null;
+  var last = yrs[yrs.length-1];
+  var oe = last.cfo - Math.abs(last.capex);
+  var perShare = m.shares ? oe/m.shares : null;
+  var yieldPct = m.marketCap ? oe/m.marketCap*100 : null;
+  var series = yrs.map(function(y){ return {label:'FY'+y.year, oe:y.cfo-Math.abs(y.capex), cfo:y.cfo}; });
+  var positive = yrs.filter(function(y){ return (y.cfo-Math.abs(y.capex))>0; }).length;
+  return {value:oe, perShare:perShare, yieldPct:yieldPct, year:last.year,
+          series:series, positiveYears:positive, totalYears:yrs.length};
+}
+
+/* Bull / base / bear from the live assumption set. Deterministic — the same
+   engine as the Valuation tab, run three times. */
+function scenarios(m){
+  var a = State.dcf;
+  var defs = [
+    {id:'bear', label:'Bear', g:num(a.growth)-6, d:num(a.discount)+1.5, t:Math.max(0,num(a.terminal)-0.5)},
+    {id:'base', label:'Base', g:num(a.growth),   d:num(a.discount),     t:num(a.terminal)},
+    {id:'bull', label:'Bull', g:num(a.growth)+6, d:Math.max(num(a.terminal)+1,num(a.discount)-1.5), t:num(a.terminal)+0.5}
+  ];
+  return defs.map(function(s){
+    var r = runDcf(m, {growth:s.g, fade:a.fade, terminal:s.t, discount:s.d});
+    return {id:s.id, label:s.label, growth:s.g, discount:s.d, terminal:s.t,
+            value:r.error?null:r.perShare, mos:r.error?null:r.mos,
+            tvShare:r.error?null:r.tvShare, error:r.error||''};
+  });
+}
+
 function dcfValue(m, g0, fade, gT, d){
   var r = runDcf(m, {growth:g0, fade:fade, terminal:gT, discount:d});
   return r.error ? null : r.perShare;
@@ -2169,6 +2327,149 @@ function viewScreen(){
       'change a weight there and this reorders. Sorting by score is not a ranking of quality; it ranks ' +
       'how well each company fits <i>your</i> criteria, and the Data column shows how much of the input ' +
       'was actually present. Open any row to see the full trace behind its number.</div>', '');
+}
+
+/* ---- ORACLE: Buffett framework, Igloo monochrome ---------------------- */
+function viewOracle(m){
+  var scr  = buffettScreen(m);
+  var oe   = ownerEarnings(m);
+  var sc   = scenarios(m);
+  var base = sc.filter(function(s){ return s.id==='base'; })[0];
+  var sig  = runSignal(m, State.weights);
+
+  /* Verdict. Descriptive, not directive: it reports what the gates did. */
+  var verdict, vsub;
+  if(scr.unknown === scr.total){
+    verdict = 'INSUFFICIENT DATA'; vsub = 'None of the five gates could be evaluated.';
+  } else if(base && base.mos !== null && base.mos < 0 && scr.fail === 0){
+    verdict = 'MARGIN OF SAFETY BREACHED';
+    vsub = 'Passes every quality gate. Priced above the model’s intrinsic value.';
+  } else if(scr.fail === 0 && scr.unknown === 0){
+    verdict = 'PASSES EVERY TEST';
+    vsub = 'All five gates cleared with complete data.';
+  } else if(scr.fail === 0){
+    verdict = 'PASSES ON PARTIAL DATA';
+    vsub = scr.unknown + ' of ' + scr.total + ' gates could not be evaluated.';
+  } else {
+    verdict = 'WAIT FOR THE PITCH';
+    vsub = scr.fail + ' of ' + scr.total + ' gates failed.';
+  }
+
+  var conf = Math.round(sig.coverage);
+
+  var gate = function(r){
+    var mark = r.status==='pass' ? '█' : (r.status==='fail' ? '░' : '·');
+    return '<div class="ig-gate ' + r.status + '">' +
+      '<div class="ig-gate-m">' + mark + '</div>' +
+      '<div class="ig-gate-l">' + esc(r.label) + '</div>' +
+      '<div class="ig-gate-t">' + esc(r.test) + '</div>' +
+      '<div class="ig-gate-v">' + esc(r.value) + '</div>' +
+    '</div>';
+  };
+
+  return '<div class="iglo">' +
+
+    /* ── header ── */
+    '<div class="ig-hero">' +
+      '<div class="ig-hero-l">' +
+        '<div class="ig-eyebrow">Oracle verdict</div>' +
+        '<div class="ig-verdict">' + esc(verdict) + '</div>' +
+        '<div class="ig-sub">' + esc(vsub) + '</div>' +
+      '</div>' +
+      '<div class="ig-hero-r">' +
+        '<div class="ig-badge">' + esc(State.ticker) + '</div>' +
+        '<div class="ig-conf"><span class="ig-pulse"></span>' +
+          '<span class="ig-conf-n">' + conf + '</span><span class="ig-conf-u">% data</span></div>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="ig-gates">' + scr.rows.map(gate).join('') + '</div>' +
+
+    /* ── 3-column framework ── */
+    '<div class="ig-grid">' +
+      '<div class="ig-cell">' +
+        '<div class="ig-h">The Castle</div>' +
+        '<div class="ig-k">' + esc(m.marginTrend===null?'--':sgn(m.marginTrend,1)+'pp') + '</div>' +
+        '<div class="ig-kl">operating margin, first to last year</div>' +
+        '<div class="ig-rows">' +
+          '<div><span>Gross margin</span><b>' + esc(pct(m.grossMargin,1)) + '</b></div>' +
+          '<div><span>Return on equity</span><b>' + esc(pct(m.roe,1)) + '</b></div>' +
+          '<div><span>Return on capital</span><b>' + esc(pct(m.roi,1)) + '</b></div>' +
+        '</div>' +
+        '<div class="ig-note">Durable pricing power shows up as margins that hold. ' +
+        'Structural sources — brand, network, patents, scale — are not in the numbers. ' +
+        'Load the 10-K on Analysis to source them.</div>' +
+      '</div>' +
+
+      '<div class="ig-cell">' +
+        '<div class="ig-h">The Math</div>' +
+        '<div class="ig-k">' + esc(oe ? money(oe.value, m.currency) : '--') + '</div>' +
+        '<div class="ig-kl">cash from operations less all capex' + (oe?', FY'+esc(oe.year):'') + '</div>' +
+        '<div class="ig-rows">' +
+          '<div><span>Per share</span><b>' + esc(oe && oe.perShare!==null ? px(oe.perShare,m.currency) : '--') + '</b></div>' +
+          '<div><span>Yield on price</span><b>' + esc(oe ? pct(oe.yieldPct,2) : '--') + '</b></div>' +
+          '<div><span>Positive years</span><b>' + esc(oe ? oe.positiveYears+'/'+oe.totalYears : '--') + '</b></div>' +
+          '<div><span>Intrinsic value</span><b>' + esc(base && base.value!==null ? px(base.value,m.currency) : '--') + '</b></div>' +
+          '<div><span>Market price</span><b>' + esc(px(m.price,m.currency)) + '</b></div>' +
+          '<div class="ig-strong"><span>Margin of safety</span><b>' +
+            esc(base && base.mos!==null ? pctS(base.mos,1) : '--') + '</b></div>' +
+        '</div>' +
+        '<div class="ig-note">Owner earnings deducts <i>maintenance</i> capex. Filings do not separate it ' +
+        'from growth capex, so this deducts all of it — the conservative reading.</div>' +
+      '</div>' +
+
+      '<div class="ig-cell">' +
+        '<div class="ig-h">Integrity</div>' +
+        '<div class="ig-k">' + esc(m.de===null?'--':fx(m.de,2)+'x') + '</div>' +
+        '<div class="ig-kl">debt against equity</div>' +
+        '<div class="ig-rows">' +
+          '<div><span>Current ratio</span><b>' + esc(m.currentRatio===null?'--':fx(m.currentRatio,2)+'x') + '</b></div>' +
+          '<div><span>Cash conversion</span><b>' + esc(oe && m.years.length ? oe.positiveYears+'/'+oe.totalYears+' yrs' : '--') + '</b></div>' +
+          '<div><span>Dividend</span><b>' + esc(pct(m.divYield,2)) + '</b></div>' +
+          '<div><span>Reported history</span><b>' + (m.years.length) + ' yrs</b></div>' +
+        '</div>' +
+        '<div class="ig-note">Capital allocation quality — buybacks, acquisitions, insider ownership — ' +
+        'is not derivable from these fields and is not asserted here.</div>' +
+      '</div>' +
+    '</div>' +
+
+    /* ── scenarios ── */
+    '<div class="ig-scen">' + sc.map(function(s){
+      return '<div class="ig-sc' + (s.id==='base'?' base':'') + '">' +
+        '<div class="ig-sc-h">' + esc(s.label) + '</div>' +
+        '<div class="ig-sc-v">' + esc(s.value===null ? '—' : px(s.value, m.currency)) + '</div>' +
+        '<div class="ig-sc-m">' + esc(s.mos===null ? (s.error?'not computable':'—') : pctS(s.mos,0) + ' margin of safety') + '</div>' +
+        '<div class="ig-sc-a">' + esc(fx(s.growth,1) + '% growth · ' + fx(s.discount,1) + '% discount · ' + fx(s.terminal,1) + '% terminal') + '</div>' +
+      '</div>';
+    }).join('') + '</div>' +
+
+    /* ── footer ── */
+    '<details class="ig-drawer"><summary>Autonomous deep-dive stream</summary>' +
+      '<div class="scroll"><table class="ig-tbl"><tbody>' +
+        '<tr><td>Company</td><td>' + esc(m.name || State.ticker) + '</td></tr>' +
+        '<tr><td>Ticker</td><td>' + esc(State.ticker) + '</td></tr>' +
+        '<tr><td>Sector</td><td>' + esc(m.industry || 'not reported') + '</td></tr>' +
+        '<tr><td>Revenue CAGR</td><td>' + esc(pctS(m.revenueCagr,1)) + ' over ' + m.years.length + ' yrs</td></tr>' +
+        '<tr><td>EPS growth</td><td>' + esc(pctS(m.epsGrowth,1)) + '</td></tr>' +
+        '<tr><td>Return on equity</td><td>' + esc(pct(m.roe,1)) + '</td></tr>' +
+        '<tr><td>Debt / equity</td><td>' + esc(m.de===null?'--':fx(m.de,2)+'x') + '</td></tr>' +
+        '<tr><td>Net margin</td><td>' + esc(pct(m.netMargin,1)) + '</td></tr>' +
+        '<tr><td>Market cap</td><td>' + esc(money(m.marketCap, m.currency)) + '</td></tr>' +
+        '<tr><td>Composite</td><td>' + esc(sig.composite===null?'--':sig.composite.toFixed(1)) +
+          ' / 100 · ' + esc(sig.band?sig.band.label:'no band') + '</td></tr>' +
+      '</tbody></table></div>' +
+    '</details>' +
+
+    '<div class="ig-maxim">&ldquo;Price is what you pay. Value is what you get.&rdquo;' +
+      '<span>' + esc(base && base.mos!==null
+        ? (base.mos > 0
+            ? 'The model puts value above price by ' + pct(Math.abs(base.mos),0) + '. Verify the assumptions before trusting the gap.'
+            : 'The model puts price above value by ' + pct(Math.abs(base.mos),0) + '. Check the sensitivity grid before calling it expensive.')
+        : 'No intrinsic value could be modelled, so no gap can be claimed.') + '</span></div>' +
+
+    '<div class="ig-foot">Gates are fixed thresholds scoring reported figures. ' +
+    'Not investment advice · nobody involved is a licensed advisor.</div>' +
+  '</div>';
 }
 
 function viewHeader(){
@@ -3008,7 +3309,8 @@ function view(){
       '<div class="mono dim" style="padding:20px;text-align:center">Enter a ticker and select ANALYZE.</div>');
   } else {
     var m = State.metrics;
-    body = State.tab==='screen'    ? viewScreen()
+    body = State.tab==='oracle'    ? viewOracle(m)
+         : State.tab==='screen'    ? viewScreen()
          : State.tab==='overview'  ? viewOverview(m)
          : State.tab==='signal'    ? viewSignal(m)
          : State.tab==='valuation' ? viewValuation(m)
