@@ -379,6 +379,23 @@ input[type=range]::-moz-range-thumb{width:17px;height:17px;border:0;border-radiu
 .chat-cites{margin-top:10px;font-family:var(--mono);font-size:10.5px;line-height:1.7;
   color:var(--faint);background:var(--well);border:1px solid var(--line);border-radius:8px;
   padding:8px 11px;overflow-x:auto;word-break:break-word}
+.chat-tog{background:var(--panel-2);border:1px solid var(--line-2);color:var(--faint);
+  font-size:10.5px;font-weight:600;padding:5px 10px;border-radius:var(--r-pill);cursor:pointer;line-height:1}
+.chat-tog.on{background:var(--text);border-color:var(--text);color:var(--bg)}
+.chat-tog:hover{color:var(--text)}
+.chat-tog.on:hover{color:var(--bg);opacity:.85}
+.chat-src{margin-top:10px;padding:9px 12px;background:var(--well);border:1px solid var(--line);
+  border-radius:8px;display:flex;flex-direction:column;gap:5px}
+.chat-src a{font-size:11.5px;color:var(--text);text-decoration:none;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.chat-src a:hover{text-decoration:underline}
+.chat-q{font-size:10.5px;color:var(--faint);margin-top:4px;line-height:1.5;white-space:normal}
+.chat-q a{font-size:10.5px;color:var(--dim);display:inline}
+.chat-warn{font-size:11.5px;color:var(--warn);border:1px solid rgba(251,191,36,.32);
+  background:rgba(251,191,36,.07);border-radius:8px;padding:8px 11px;margin-bottom:10px;line-height:1.5}
+.chat-g{margin-top:12px;padding:11px 13px;border-left:2px solid var(--dim);
+  background:var(--panel-2);border-radius:0 8px 8px 0;font-size:13px;line-height:1.55}
+.chat-g .chat-j-l{color:var(--dim)}
 .chat-j{margin-top:12px;padding:11px 13px;border-left:2px solid var(--warn);
   background:rgba(251,191,36,.06);border-radius:0 8px 8px 0;font-size:13px;line-height:1.55}
 .chat-j-l{display:block;font-family:var(--sans);font-size:9.5px;font-weight:700;letter-spacing:.1em;
@@ -721,18 +738,24 @@ var CFG = {
   CHAT_ROLE:
     'You answer as a long-horizon value investor in the tradition of Warren Buffett: plain English,\n' +
     'short sentences, no jargon without explanation, no hype, no price predictions.\n\n' +
-    'You speak in TWO registers and must never blur them.\n\n' +
-    'FACTS — anything you assert about this company. Every one must cite the evidence:\n' +
-    '  [SOURCE-ID, field]: value\n' +
-    'If the evidence does not contain it, do not assert it. Say what is missing instead and add it\n' +
-    'to notInData. Your training knowledge about this company does not count as evidence. Naming\n' +
-    'products, customers, competitors or strategy is not supported by a ticker or an industry label.\n\n' +
-    'JUDGEMENT — how a value investor would read those facts: durability of the moat, owner\n' +
-    'earnings quality, margin of safety, circle of competence, temperament. This is reasoning, not\n' +
-    'fact, and is rendered separately to the reader. Ground it in the figures you just cited.\n\n' +
-    'You may be asked to explain a number on screen, to argue against the user, or a general\n' +
-    'question. If asked whether to buy or sell, decline the instruction and instead lay out what\n' +
-    'the evidence supports and what would have to be true. Never give a buy or sell directive.',
+    'Be genuinely useful. Answer the question that was asked. You have THREE registers, and the\n' +
+    'only unbreakable rule is that you never let one masquerade as another — each is shown to the\n' +
+    'reader under its own heading, so the reader always knows how much weight a statement carries.\n\n' +
+    '1. ANSWER — claims drawn from the EVIDENCE below. Every figure gets a citation:\n' +
+    '     [SOURCE-ID, field]: value\n' +
+    '   Numbers, scores, filings and peer comparisons belong here. Never put an uncited figure here.\n\n' +
+    '2. GENERAL — what you know about this company from training that the evidence does not carry:\n' +
+    '   what it sells, who buys it, how the industry works, its history, its competitors. ANSWER THE\n' +
+    '   QUESTION here rather than refusing it. Two constraints: never state a financial figure in\n' +
+    '   this register (those must be cited or omitted), and flag anything that may have changed\n' +
+    '   since your training. The reader sees this under "General knowledge — not from the data".\n\n' +
+    '3. JUDGEMENT — how a value investor reads it: moat durability, owner earnings quality, margin\n' +
+    '   of safety, circle of competence, temperament. Reasoning, not fact.\n\n' +
+    'Use notInData only for things that are genuinely unknowable to you AND absent from the\n' +
+    'evidence — not as a way to dodge a fair question.\n\n' +
+    'If a filing has been supplied, prefer quoting it over general knowledge, and say so.\n\n' +
+    'If asked whether to buy or sell, decline the instruction and instead lay out what the evidence\n' +
+    'supports and what would have to be true. Never give a buy or sell directive.',
 
   DEF_WEIGHTS: {valuation:25, growth:25, quality:25, balance:25},
   DEF_DCF:     {growth:8, fade:10, terminal:2.5, discount:9},
@@ -974,6 +997,7 @@ var State = {
   chat:      [],
   chatOpen:  false,
   chatBusy:  false,
+  chatSearch:true,
   sort:      'score',
   bandFilter:'',
   deb:       {status:'idle', bull:null, bear:null, judge:null, error:'', at:''},
@@ -1353,33 +1377,53 @@ function chatEvidence(){
   return L.join('\n');
 }
 
-/* One chat turn. History is included so follow-ups work. */
+/* One chat turn. History is included so follow-ups work.
+   With search on, Gemini browses server-side — the page never fetches, so CORS
+   never applies. Note the API rejects tools alongside responseMimeType json,
+   so grounded turns ask for JSON in the prompt and lean on the salvage parse. */
 function apiChat(question, history){
+  var search = !!State.chatSearch;
   var turns = (history||[]).slice(-6).map(function(t){
     return (t.role === 'user' ? 'USER: ' : 'YOU: ') + t.text;
   }).join('\n');
 
+  var searchRules = search
+    ? '\nWEB SEARCH IS AVAILABLE. Use it for what the evidence lacks: what the company sells, who it\n' +
+      'competes with, recent events, industry context. Two hard limits:\n' +
+      '  - FINANCIAL FIGURES FOR THIS COMPANY MUST COME FROM THE EVIDENCE, NOT FROM SEARCH. The\n' +
+      '    evidence is this terminal\'s own computed data and is authoritative here. If a search\n' +
+      '    result disagrees with a figure in EVIDENCE, cite the EVIDENCE and note the discrepancy\n' +
+      '    rather than silently replacing it.\n' +
+      '  - Anything learned from search goes in "general", never in "answer".\n'
+    : '';
+
   var prompt =
-    CFG.CHAT_ROLE + '\n\n' +
+    CFG.CHAT_ROLE + '\n' + searchRules + '\n' +
     'EVIDENCE\n' + chatEvidence() + '\n\n' +
     (turns ? 'CONVERSATION SO FAR\n' + turns + '\n\n' : '') +
     'USER QUESTION\n' + question + '\n\n' +
     'OUTPUT — raw JSON only, no fences, no preamble:\n' +
-    '{"answer":string,"citations":[string],"judgement":string,"notInData":[string]}\n\n' +
-    'answer: the factual reply, 2-6 short sentences. Only what the evidence supports.\n' +
-    'citations: every figure you used, each as "[SOURCE-ID, field]: value". Empty if you asserted\n' +
-    '  no figures. Ids must come from EVIDENCE above — never invent one.\n' +
-    'judgement: how a value investor reads it, 1-4 sentences. May go beyond the figures but must\n' +
-    '  follow from them. Empty string if the question is purely factual.\n' +
-    'notInData: anything the question asked for that the evidence cannot answer. Empty if none.';
+    '{"answer":string,"citations":[string],"general":string,"judgement":string,"notInData":[string]}\n\n' +
+    'answer: what the EVIDENCE supports, 2-6 short sentences. Every figure cited. Empty string if\n' +
+    '  the evidence has nothing to say on this question — that is fine, use general instead.\n' +
+    'citations: every figure used in answer, each as "[SOURCE-ID, field]: value". Ids must come\n' +
+    '  from EVIDENCE above — never invent one. Empty if answer asserted no figures.\n' +
+    'general: what you know from training that the evidence lacks — products, customers, business\n' +
+    '  model, competitors, history. Answer the question here rather than refusing. No financial\n' +
+    '  figures in this field. Empty string if the evidence already answered it fully.\n' +
+    'judgement: how a value investor reads it, 1-4 sentences. Empty if purely factual.\n' +
+    'notInData: only what is genuinely unknowable and absent from the evidence. Usually empty.';
+
+  var gen = {maxOutputTokens: 4500, temperature:0.3, thinkingConfig:{thinkingBudget:0}};
+  /* responseMimeType and tools are mutually exclusive on this API. */
+  if(!search) gen.responseMimeType = 'application/json';
+
+  var payload = {contents:[{parts:[{text: prompt}]}], generationConfig: gen};
+  if(search) payload.tools = [{google_search:{}}];
 
   return fetch(CFG.AI + '?key=' + encodeURIComponent(AI_KEY), {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({
-      contents:[{parts:[{text: prompt}]}],
-      generationConfig:{maxOutputTokens: 3000, responseMimeType:'application/json',
-                        temperature:0.3, thinkingConfig:{thinkingBudget:0}}
-    })
+    body: JSON.stringify(payload)
   })
   .catch(function(){ throw new ApiErr(netMsg('generativelanguage.googleapis.com'), 0); })
   .then(function(r){
@@ -1395,9 +1439,42 @@ function apiChat(question, history){
         if(!cand) throw new ApiErr('The model returned nothing — possibly a safety filter.', 0);
         var text = ((cand.content && cand.content.parts) || []).map(function(p){ return p.text||''; }).join('');
         if(!text.trim()) throw new ApiErr('Empty response.', 0);
-        try { return parseLooseJson(text); }
-        catch(e){ throw new ApiErr('Could not parse the reply' +
-          (cand.finishReason==='MAX_TOKENS' ? ' — it was cut off. Try a narrower question.' : '.'), 0); }
+
+        /* What the model actually searched and read, so the reader can check it. */
+        var gm = cand.groundingMetadata || {};
+        var web = (gm.groundingChunks || []).map(function(ch){
+          var w = ch.web || {};
+          return {title: w.title || '', uri: w.uri || ''};
+        }).filter(function(s){ return s.uri; });
+        var queries = gm.webSearchQueries || [];
+        var attach = function(o){ o.web = web; o.queries = queries; return o; };
+
+        try { return attach(parseLooseJson(text)); }
+        catch(e){
+          /* Salvage rather than fail. A malformed envelope should not throw
+             away a usable answer — pull the fields out by hand, and if even
+             that fails, show the raw text flagged as unverified. */
+          var grab = function(k){
+            var m = text.match(new RegExp('"' + k + '"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"'));
+            return m ? m[1].replace(/\\"/g,'"').replace(/\\n/g,'\n').replace(/\\\\/g,'\\') : '';
+          };
+          var arr = function(k){
+            var m = text.match(new RegExp('"' + k + '"\\s*:\\s*\\[([\\s\\S]*?)\\]'));
+            if(!m) return [];
+            return (m[1].match(/"((?:[^"\\]|\\.)*)"/g)||[])
+              .map(function(s){ return s.slice(1,-1).replace(/\\"/g,'"'); });
+          };
+          var salvaged = {answer:grab('answer'), citations:arr('citations'),
+                          general:grab('general'), judgement:grab('judgement'),
+                          notInData:arr('notInData'), partial:true};
+          if(salvaged.answer || salvaged.general || salvaged.judgement) return attach(salvaged);
+
+          var plain = text.replace(/^\s*[\{\[][\s\S]*?"answer"\s*:\s*"?/,'').replace(/"?\s*[\}\]]\s*$/,'').trim();
+          if(plain.length > 20) return attach({answer:plain, citations:[], general:'', judgement:'',
+                                        notInData:[], partial:true, unverified:true});
+          throw new ApiErr('The reply came back malformed' +
+            (cand.finishReason==='MAX_TOKENS' ? ' and was cut off — try a narrower question.' : '. Try rephrasing.'), 0);
+        }
       });
   });
 }
@@ -2716,9 +2793,9 @@ function viewChat(){
       '<div class="chat-empty-p">Facts are cited to the data. Opinion is marked separately. ' +
       'Anything the figures cannot answer, it says so.</div>' +
       '<div class="chat-seeds">' +
-        ['Why did Valuation score what it did?',
-         'What is the margin of safety telling me?',
-         'How does this compare with its peers on debt?',
+        ['What does this company actually do?',
+         'Why did Valuation score what it did?',
+         'How does it compare with its peers on debt?',
          'What would make this a mistake?'].map(function(q){
           return '<button type="button" class="chat-seed" data-act="chatAsk" data-q="'+attr(q)+'">'+esc(q)+'</button>';
         }).join('') +
@@ -2733,9 +2810,27 @@ function viewChat(){
       var cites = asArr(d.citations).filter(function(c){ return String(c||'').trim(); });
       var gaps  = asArr(d.notInData).filter(function(c){ return String(c||'').trim(); });
       return '<div class="chat-a">' +
+        (d.partial ? '<div class="chat-warn">Reply arrived malformed and was recovered' + (d.unverified?' — treat the text below as unverified':'') + '.</div>' : '') +
         (d.answer ? '<div class="chat-txt">'+esc(d.answer)+'</div>' : '') +
         (cites.length ? '<div class="chat-cites">' + cites.map(function(c){
             return '<div>'+esc(typeof c==='string'?c:JSON.stringify(c))+'</div>'; }).join('') + '</div>' : '') +
+        (d.general ? '<div class="chat-g"><span class="chat-j-l">' +
+            (asArr(d.web).length ? 'From the web — not from the data' : 'General knowledge — not from the data') +
+            '</span>' + esc(d.general) + '</div>' : '') +
+        (asArr(d.web).length
+          ? '<div class="chat-src"><span class="chat-j-l">Sources the model read</span>' +
+            asArr(d.web).slice(0,6).map(function(s){
+              return '<a href="'+attr(s.uri)+'" target="_blank" rel="noopener noreferrer nofollow">' +
+                esc(s.title || s.uri) + ' &#8599;</a>';
+            }).join('') +
+            (asArr(d.queries).length
+              ? '<div class="chat-q">Searched: ' + asArr(d.queries).map(function(q){
+                  return '<a href="https://www.google.com/search?q=' + encodeURIComponent(q) +
+                    '" target="_blank" rel="noopener noreferrer nofollow">' + esc(q) + '</a>';
+                }).join(', ') + '</div>'
+              : '') +
+            '</div>'
+          : '') +
         (d.judgement ? '<div class="chat-j"><span class="chat-j-l">Judgement — not from the data</span>' +
             esc(d.judgement) + '</div>' : '') +
         (gaps.length ? '<div class="chat-gaps"><span class="chat-j-l">Not in the data</span>' +
@@ -2750,6 +2845,11 @@ function viewChat(){
       '<div><div class="chat-title">Analyst</div>' +
       '<div class="chat-sub">' + (State.metrics ? esc(State.ticker) + ' · cites or declines' : 'no company loaded') + '</div></div>' +
       '<div class="row" style="gap:4px">' +
+        '<button type="button" class="chat-tog' + (State.chatSearch?' on':'') + '" data-act="chatSearchToggle" ' +
+          'title="'+attr(State.chatSearch
+            ? 'Web search on. The model browses and cites real sources for anything the data lacks.'
+            : 'Web search off. Answers come only from the loaded data and the model’s own knowledge.')+'">' +
+          'Web ' + (State.chatSearch ? 'on' : 'off') + '</button>' +
         (msgs.length ? '<button type="button" class="chat-x" data-act="chatClear" title="Clear">&#8635;</button>' : '') +
         '<button type="button" class="chat-x" data-act="chatClose" aria-label="Close">&#10005;</button>' +
       '</div>' +
@@ -3948,6 +4048,7 @@ var ACT = {
   chatOpen:  function(){ State.chatOpen = true;  render(); scrollChat(); },
   chatClose: function(){ State.chatOpen = false; render(); },
   chatClear: function(){ State.chat = []; Draft.chat = ''; render(); },
+  chatSearchToggle: function(){ State.chatSearch = !State.chatSearch; render(); },
   chatAsk:   function(el){ chatSend(el.getAttribute('data-q')); },
   chatSend:  function(){ chatSend(Draft.chat); },
   sort: function(el){ State.sort = el.getAttribute('data-sort'); render(); },
